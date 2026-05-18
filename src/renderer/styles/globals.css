@@ -2,79 +2,219 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Fonts ──────────────────────────────────────────────────────
+   The two typefaces that *are* the Keyfloe visual brand:
+   - Fraunces  (variable serif) — display headlines, mixed italic
+   - Departure Mono (pixel-mono) — eyebrow labels, status chips, captions
+   Same files the Mac app bundles under Resources/.
+─────────────────────────────────────────────────────────────────── */
+@font-face {
+  font-family: 'Fraunces';
+  src: url('../assets/fonts/Fraunces.ttf') format('truetype-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Fraunces';
+  src: url('../assets/fonts/Fraunces-Italic.ttf') format('truetype-variations');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: block;
+}
+@font-face {
+  font-family: 'DepartureMono';
+  src: url('../assets/fonts/DepartureMono-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+/* ─── Editorial palette tokens (matches OneClickStyle.swift) ─────
+   Paper / bone / ink palette — warm cream + deep ink. Auto-flips in
+   dark mode via the media query at the bottom. */
+:root {
+  --paper:   #f5f1ea;
+  --bone:    #ebe5d9;
+  --ink-900: #0a0a0b;
+  --ink-600: #5b5b5e;
+  --ink-400: #9a9a9d;
+  --hairline: rgba(10, 10, 11, 0.15);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper:   #0d0d0e;
+    --bone:    #18181b;
+    --ink-900: #f5f1ea;
+    --ink-600: #a3a3a6;
+    --ink-400: #78787c;
+    --hairline: rgba(245, 241, 234, 0.12);
+  }
+}
+
 html, body, #root {
   margin: 0;
   padding: 0;
   height: 100vh;
-  font-family: 'Segoe UI Variable', 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  color: #ECEEED;
+  background: var(--paper);
+  color: var(--ink-900);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable',
+               'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   user-select: none;
 }
 
-body {
+/* The notch shell + overlay windows want a transparent body. They
+   override .bg-transparent on <body>; the dashboard does NOT. */
+body.transparent {
   background: transparent;
 }
 
-/* Faux NSVisualEffectView. Windows has no system-wide vibrancy
-   material, so we approximate with a heavy backdrop blur + low-opacity
-   fill. Same recipe as the Mac PillBackground when running on
-   macOS 14/15 fallback. */
-.pill-glass {
-  background: rgba(23, 25, 24, 0.78);
-  backdrop-filter: blur(32px) saturate(140%);
-  -webkit-backdrop-filter: blur(32px) saturate(140%);
-  border: 0.5px solid rgba(255, 255, 255, 0.22);
+/* ─── Editorial type helpers ─────────────────────────────────── */
+.font-serif    { font-family: 'Fraunces', Georgia, serif; }
+.font-pixel    { font-family: 'DepartureMono', ui-monospace, 'Cascadia Mono', Consolas, monospace; }
+.font-display  {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  line-height: 1.04;
+}
+.font-display-italic {
+  font-family: 'Fraunces', Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+}
+.pixel-eyebrow {
+  font-family: 'DepartureMono', ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* ─── Sculpted panel recipe (the "cofounder card") ───────────────
+   Translation of OneClickStyle.PanelSculpted (Swift). Four layers:
+     • bright top-edge highlight (inset white gradient)
+     • inner highlight ring (thin inner stroke)
+     • outer pale ring (wide low-alpha outer stroke)
+     • soft outer halo (drop shadow) */
+.panel-sculpted {
+  position: relative;
+  background: var(--paper);
+  border-radius: 12px;
   box-shadow:
-    0 18px 60px rgba(0, 0, 0, 0.50),
-    0 4px 14px rgba(0, 0, 0, 0.30);
+    inset 0  0   0  0.5px rgba(255,255,255,0.35),   /* inner highlight ring */
+    inset 0  1.5px 0 0    rgba(255,255,255,0.55),   /* bright top edge */
+    0 0 0 4px rgba(10,10,11,0.04),                   /* wide pale outer ring */
+    0 4px 12px rgba(10,10,11,0.18);                  /* soft outer halo */
+}
+@media (prefers-color-scheme: dark) {
+  .panel-sculpted {
+    box-shadow:
+      inset 0  0   0  0.5px rgba(255,255,255,0.08),
+      inset 0  1.5px 0 0    rgba(255,255,255,0.10),
+      0 0 0 4px rgba(245,241,234,0.04),
+      0 4px 12px rgba(0,0,0,0.45);
+  }
+}
+.panel-sculpted-pill {
+  border-radius: 999px;
+}
+.panel-sculpted-ink {
+  background: var(--ink-900);
+  color: var(--paper);
+  box-shadow:
+    inset 0  0   0  0.5px rgba(255,255,255,0.10),
+    inset 0  1.5px 0 0    rgba(255,255,255,0.10),
+    0 0 0 4px rgba(245,241,234,0.06),
+    0 4px 12px rgba(0,0,0,0.45);
 }
 
-.pill-glass-clear {
-  background: rgba(23, 25, 24, 0.34);
-  backdrop-filter: blur(20px) saturate(120%);
-  -webkit-backdrop-filter: blur(20px) saturate(120%);
-  border: 0.5px solid rgba(255, 255, 255, 0.18);
+/* ─── Editorial divider — hairline horizontal rule ──────────── */
+.editorial-divider {
+  height: 0.5px;
+  background: var(--hairline);
+  border: 0;
 }
 
-/* The drag handle: AppKit's NSWindow.movableByWindowBackground equivalent
-   for Electron is the -webkit-app-region: drag CSS property. Apply to the
-   pill background; opt children that need to be clickable out with
-   no-drag. */
+/* ─── Editorial button — uppercase tracked, hairline or solid ── */
+.editorial-button {
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  padding: 9px 14px;
+  color: var(--ink-900);
+  background: transparent;
+  border: 0.8px solid var(--ink-900);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.editorial-button:hover {
+  background: var(--ink-900);
+  color: var(--paper);
+}
+.editorial-button.solid {
+  background: var(--ink-900);
+  color: var(--paper);
+}
+.editorial-button.solid:hover {
+  background: var(--ink-600);
+  border-color: var(--ink-600);
+}
+
+/* ─── Notch window styling ──────────────────────────────────── */
+.notch-window-body {
+  background: transparent !important;
+}
+
+/* Drag handle helpers — Electron's CSS region. */
 .app-drag    { -webkit-app-region: drag; }
 .app-no-drag { -webkit-app-region: no-drag; }
 
-/* Dot-grid overlay shared by pill + dashboard hero. 18 px grid, 0.9 px
-   dots, 16% ink, soft radial mask fade. Same recipe as Hero.tsx in the
-   marketing site. */
-.dot-grid {
-  background-image: radial-gradient(rgba(255,255,255,0.16) 0.9px, transparent 0.9px);
-  background-size: 18px 18px;
-  mask-image: radial-gradient(circle at 50% 30%, black 30%, transparent 80%);
-  -webkit-mask-image: radial-gradient(circle at 50% 30%, black 30%, transparent 80%);
-}
-
-/* Tiny scrollbars. Default Windows scrollbars are loud against the
-   dark pill body. */
+/* Scrollbars — keep them out of the way of the editorial layout. */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.20); }
+::-webkit-scrollbar-thumb { background: var(--hairline); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-400); }
 ::-webkit-scrollbar-track { background: transparent; }
 
-/* Push-to-talk waveform bars. Animated via Tailwind keyframes
-   (animate-pulse-mic), staggered per bar via inline animation-delay. */
+/* Mic waveform bars — pulse with the captured level. */
 .mic-bar {
   width: 3px;
   border-radius: 2px;
-  background: #60a5fa;
+  background: var(--ink-900);
   transform-origin: center;
 }
 
-/* Streaming "typing" dots — same look as iMessage. */
+/* iMessage-style streaming "typing" dots. */
 .typing-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.55);
+  background: var(--ink-600);
   display: inline-block;
+  animation: typing-dot 1.2s ease-in-out infinite;
 }
+@keyframes typing-dot {
+  0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+  40%           { opacity: 1;   transform: scale(1.0); }
+}
+
+/* Live dot — green pulsing, matches StatusChip variant=.live. */
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #20c55c;
+  box-shadow: 0 0 6px rgba(32, 197, 92, 0.5);
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+
+/* Status chip dot tone variations */
+.ok-dot   { width: 6px; height: 6px; border-radius: 50%; background: #20c55c; }
+.ink-dot  { width: 6px; height: 6px; border-radius: 50%; background: rgba(245, 241, 234, 0.6); }

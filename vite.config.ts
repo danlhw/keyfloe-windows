@@ -21,9 +21,10 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
+        notch:     path.resolve(__dirname, 'src/renderer/notch.html'),
         dashboard: path.resolve(__dirname, 'src/renderer/dashboard.html'),
-        pill: path.resolve(__dirname, 'src/renderer/pill.html'),
-        overlay: path.resolve(__dirname, 'src/renderer/overlay.html'),
+        pill:      path.resolve(__dirname, 'src/renderer/pill.html'),
+        overlay:   path.resolve(__dirname, 'src/renderer/overlay.html'),
       },
     },
   },

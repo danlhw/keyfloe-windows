@@ -102,25 +102,32 @@ export class Dictation {
     }
   }
 
-  // Send Ctrl+V to the focused window. PowerShell's SendKeys uses the
-  // active foreground window, which is exactly what we want — the user's
-  // text field, not Keyfloe itself. Special chars in the transcript are
-  // not used here (we send literal Ctrl+V to paste from clipboard, not
-  // type the text out character by character).
+  // Paste into whatever app currently has focus. Platform-specific
+  // shim — we only ship Windows in production, but the macOS path is
+  // here so the dev loop works end-to-end on the developer's Mac.
   private paste(_text: string) {
-    if (process.platform !== 'win32') {
-      logger.warn('dictation', 'paste skipped — non-Windows platform');
+    if (process.platform === 'win32') {
+      // VB SendKeys trick: "^v" = Ctrl+V. Hits the foreground window,
+      // not Keyfloe itself — that's the focused text field.
+      exec(
+        'powershell -NoProfile -WindowStyle Hidden -Command ' +
+        '"[System.Reflection.Assembly]::LoadWithPartialName(\'System.Windows.Forms\') | Out-Null; ' +
+        '[System.Windows.Forms.SendKeys]::SendWait(\'^v\')"',
+        (err) => { if (err) logger.error('dictation.paste', err); },
+      );
       return;
     }
-    // Microsoft-recommended VB SendKeys trick: "^v" = Ctrl+V.
-    exec(
-      'powershell -NoProfile -WindowStyle Hidden -Command ' +
-      '"[System.Reflection.Assembly]::LoadWithPartialName(\'System.Windows.Forms\') | Out-Null; ' +
-      '[System.Windows.Forms.SendKeys]::SendWait(\'^v\')"',
-      (err) => {
-        if (err) logger.error('dictation.paste', err);
-      },
-    );
+    if (process.platform === 'darwin') {
+      // AppleScript equivalent — sends ⌘V to the frontmost app. Needs
+      // Accessibility permission for the Electron binary; the same
+      // grant that lets uiohook capture keyboard events.
+      exec(
+        `osascript -e 'tell application "System Events" to keystroke "v" using command down'`,
+        (err) => { if (err) logger.error('dictation.paste', err); },
+      );
+      return;
+    }
+    logger.warn('dictation', `paste skipped — unsupported platform ${process.platform}`);
   }
 
   private broadcast(channel: string, payload: unknown) {

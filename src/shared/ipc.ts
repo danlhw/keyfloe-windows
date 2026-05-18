@@ -15,6 +15,7 @@ export const IPC = {
   pillHide:          'pill:hide',
   pillToggle:        'pill:toggle',
   pillResize:        'pill:resize',
+  notchSetState:     'notch:set-state',
   settingsGet:       'settings:get',
   settingsSet:       'settings:set',
   dictationPaste:    'dictation:paste',

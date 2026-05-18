@@ -1,301 +1,603 @@
+/**
+ * Dashboard — port of app/Sources/Dashboard/DashboardView.swift. Renders
+ * the 7 visible tabs in a left sidebar + detail layout, matching the
+ * Mac app's NavigationSplitView exactly.
+ *
+ * Sidebar:
+ *   Home / Tasks / Profile / Dictations / Conversations / Billing / Settings
+ *
+ * Every tab is laid out on warm paper (--paper / --ink-900 in dark mode),
+ * uses Fraunces display + Departure Mono eyebrows, and wraps its
+ * sections in panel-sculpted cards. The Mac side is the source of truth
+ * for copy + spacing — if something diverges, fix it here, not in the
+ * design system.
+ */
 import { useEffect, useState } from 'react';
-import type { ActivationKey, AppSettings } from '@shared/types';
+import type { AppSettings, ActivationKey } from '@shared/types';
+import {
+  EditorialEyebrow, DisplayTitle, EditorialDivider, EditorialCard,
+  EditorialButton, TabHeader, StatusChip, SegmentedLoader, SectionHeading,
+} from '../components/editorial';
 
-// Port of Dashboard/DashboardView.swift — three tabs: Home (status +
-// activation key + quick test), Settings (API keys, worker URL,
-// activation key picker), About. Slimmer than the Mac dashboard
-// (which has Tasks, Memory, Skills, Profiles, Billing) because the
-// Windows scope is only the three live modes.
+type Tab =
+  | 'home' | 'tasks' | 'profile' | 'dictations'
+  | 'conversations' | 'billing' | 'settings';
 
-type Tab = 'home' | 'settings' | 'about';
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'home',          label: 'Home' },
+  { id: 'tasks',         label: 'Tasks' },
+  { id: 'profile',       label: 'Profile' },
+  { id: 'dictations',    label: 'Dictations' },
+  { id: 'conversations', label: 'Conversations' },
+  { id: 'billing',       label: 'Billing' },
+  { id: 'settings',      label: 'Settings' },
+];
 
 export function Dashboard() {
   const [tab, setTab] = useState<Tab>('home');
-  const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [dictationCount, setDictationCount] = useState(0);
-  const [hotkeyEvents, setHotkeyEvents] = useState<string[]>([]);
-
-  useEffect(() => {
-    window.keyfloe.settings.get().then(setSettings);
-    const off1 = window.keyfloe.settings.onChange(setSettings);
-    const off2 = window.keyfloe.hotkey.onTap(() => {
-      setHotkeyEvents((prev) => [`tap @ ${time()}`, ...prev].slice(0, 5));
-    });
-    const off3 = window.keyfloe.hotkey.onHoldStart(() => {
-      setHotkeyEvents((prev) => [`hold-start @ ${time()}`, ...prev].slice(0, 5));
-    });
-    const off4 = window.keyfloe.hotkey.onHoldEnd(() => {
-      setHotkeyEvents((prev) => [`hold-end @ ${time()}`, ...prev].slice(0, 5));
-      setDictationCount((n) => n + 1);
-    });
-    return () => { off1(); off2(); off3(); off4(); };
-  }, []);
-
-  if (!settings) {
-    return <div className="p-6 text-text-secondary">Loading…</div>;
-  }
 
   return (
-    <div className="flex flex-col h-screen bg-bg-base text-text-primary">
-      <Header />
-      <div className="flex flex-1 min-h-0">
-        <Sidebar tab={tab} setTab={setTab} />
-        <main className="flex-1 overflow-y-auto p-8">
-          {tab === 'home'     && <Home settings={settings} dictationCount={dictationCount} hotkeyEvents={hotkeyEvents} />}
-          {tab === 'settings' && <Settings settings={settings} />}
-          {tab === 'about'    && <About />}
-        </main>
+    <div className="flex w-full h-full min-h-0 bg-paper">
+      <Sidebar tab={tab} setTab={setTab} />
+      <main className="flex-1 min-w-0 overflow-y-auto">
+        {tab === 'home'          && <HomeTab />}
+        {tab === 'tasks'         && <TasksTab />}
+        {tab === 'profile'       && <ProfileTab />}
+        {tab === 'dictations'    && <DictationsTab />}
+        {tab === 'conversations' && <ConversationsTab />}
+        {tab === 'billing'       && <BillingTab />}
+        {tab === 'settings'      && <SettingsTab />}
+      </main>
+    </div>
+  );
+}
+
+function Sidebar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
+  return (
+    <nav
+      className="border-r border-hairline bg-paper py-6 px-3"
+      style={{ width: 200, minWidth: 200 }}
+    >
+      <div className="px-3 pb-6">
+        <span className="font-pixel text-eyebrow tracking-eyebrow uppercase text-ink-900">
+          Keyfloe
+        </span>
+      </div>
+      <div className="flex flex-col gap-1">
+        {TABS.map((it) => {
+          const active = tab === it.id;
+          return (
+            <button
+              key={it.id}
+              onClick={() => setTab(it.id)}
+              className={[
+                'app-no-drag text-left px-3 py-2 rounded-sm',
+                'pixel-eyebrow',
+                active ? 'text-ink-900' : 'text-ink-600 hover:text-ink-900',
+              ].join(' ')}
+              style={active ? { background: 'var(--hairline)' } : undefined}
+            >
+              {it.label.toUpperCase()}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+// ─── HOME ──────────────────────────────────────────────────────────
+
+function HomeTab() {
+  return (
+    <div
+      className="px-10 py-9 flex flex-col gap-0"
+      style={{ maxWidth: 1100 }}
+    >
+      <div className="flex items-center gap-3 pb-6">
+        <StatusChip text="Running on Windows" variant="live" />
+        <StatusChip text="Keyfloe" trailing="v0.1 · beta" variant="ink" />
+      </div>
+
+      <TabHeader
+        eyebrow="Today"
+        trailingEyebrow="Signature ’26"
+        title="Your PC, with a "
+        italic="memory."
+      />
+
+      <p
+        className="text-ink-600 leading-relaxed pb-9"
+        style={{ maxWidth: 640, fontSize: 15, lineHeight: 1.55 }}
+      >
+        Tap Right-Ctrl anywhere to chat. Hold Right-Ctrl to dictate. The
+        pill listens, sees what's on screen, and helps without leaving
+        the corner of your eye.
+      </p>
+
+      <EditorialDivider className="mb-8" />
+
+      <div className="flex flex-col gap-6">
+        <ActiveTasksCard />
+        <MemoryPeekCard />
+        <DictationStatsCard />
       </div>
     </div>
   );
 }
 
-function Header() {
+function ActiveTasksCard() {
   return (
-    <header className="h-9 bg-bg-1 border-b border-border-subtle flex items-center px-4 app-drag select-none">
-      <span className="text-text-primary font-medium text-sm">Keyfloe</span>
-      <span className="ml-2 text-text-tertiary text-xs">for Windows</span>
-    </header>
+    <EditorialCard>
+      <div className="flex items-center justify-between pb-1">
+        <StatusChip text="Floe Agent" trailing="idle" variant="ghost" />
+      </div>
+      <p className="text-ink-600 leading-relaxed" style={{ fontSize: 13.5 }}>
+        No tasks yet. Hold Right-Ctrl and tell the agent what to do —
+        it runs in the background and lands a notification when it's done.
+      </p>
+    </EditorialCard>
   );
 }
 
-function Sidebar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
-  const items: { id: Tab; label: string }[] = [
-    { id: 'home',     label: 'Home' },
-    { id: 'settings', label: 'Settings' },
-    { id: 'about',    label: 'About' },
-  ];
+function MemoryPeekCard() {
   return (
-    <nav className="w-48 border-r border-border-subtle bg-bg-1 p-3 flex flex-col gap-1">
-      {items.map((it) => (
-        <button
-          key={it.id}
-          onClick={() => setTab(it.id)}
-          className={[
-            'text-left text-sm px-3 py-2 rounded-md',
-            tab === it.id
-              ? 'bg-accent-600 text-white'
-              : 'text-text-secondary hover:bg-bg-2',
-          ].join(' ')}
-        >
-          {it.label}
-        </button>
-      ))}
-    </nav>
+    <EditorialCard>
+      <div className="flex items-center justify-between pb-1">
+        <StatusChip text="Memory" trailing="empty" variant="ghost" />
+        <EditorialButton label="Edit" onClick={() => undefined} />
+      </div>
+      <p className="text-ink-600 leading-relaxed" style={{ fontSize: 13.5 }}>
+        Nothing memorised yet. Tell the agent something durable —
+        "I'm Daniel, my team is Onefloe" — and it'll save it here so
+        the next conversation already knows.
+      </p>
+    </EditorialCard>
   );
 }
 
-function Home({ settings, dictationCount, hotkeyEvents }: {
-  settings: AppSettings;
-  dictationCount: number;
-  hotkeyEvents: string[];
-}) {
+function DictationStatsCard() {
   return (
-    <div className="flex flex-col gap-6 max-w-3xl">
-      <section>
-        <h1 className="text-2xl font-medium mb-1">Welcome to Keyfloe</h1>
-        <p className="text-text-secondary text-sm">
-          Tap <Kbd>{settings.activationKey}</Kbd> to open the pill, hold it to dictate,
-          and toggle interview mode from the pill toolbar.
-        </p>
-      </section>
-
-      <section className="grid grid-cols-3 gap-3">
-        <StatCard label="Activation key"     value={settings.activationKey} />
-        <StatCard label="Dictations today"   value={dictationCount.toString()} />
-        <StatCard label="Whisper model"      value={settings.whisperModel} />
-      </section>
-
-      <section>
-        <h2 className="text-text-secondary text-xs uppercase tracking-wider mb-2">
-          Quick start
-        </h2>
-        <ol className="text-sm text-text-primary list-decimal list-inside flex flex-col gap-1.5">
-          <li>Press <Kbd>{settings.activationKey}</Kbd> to open the chat pill anywhere on your screen.</li>
-          <li>Hold <Kbd>{settings.activationKey}</Kbd> to dictate — release to paste into the focused app.</li>
-          <li>Click <em>Interview</em> in the pill toolbar to start the live-call helper.</li>
-          <li>Ask Keyfloe "where is X?" — a blue cursor will land on it.</li>
-        </ol>
-      </section>
-
-      <section>
-        <h2 className="text-text-secondary text-xs uppercase tracking-wider mb-2">
-          Recent hotkey events
-        </h2>
-        <div className="bg-bg-1 rounded-md border border-border-subtle px-3 py-2 font-mono text-xs text-text-secondary min-h-[3rem]">
-          {hotkeyEvents.length === 0 ? (
-            <span className="text-text-tertiary">No events yet — try pressing your activation key.</span>
-          ) : hotkeyEvents.map((e, i) => <div key={i}>{e}</div>)}
+    <EditorialCard>
+      <div className="flex items-center justify-between pb-3">
+        <StatusChip text="Dictation throughput" variant="ghost" />
+        <span className="font-pixel text-eyebrow text-ink-400">last 7 days</span>
+      </div>
+      <div className="flex items-baseline gap-6 pb-3">
+        <div>
+          <div className="font-display text-display-md text-ink-900">0</div>
+          <div className="pixel-eyebrow text-ink-400 pt-1">Words</div>
         </div>
-      </section>
+        <div>
+          <div className="font-display text-display-md text-ink-900">—</div>
+          <div className="pixel-eyebrow text-ink-400 pt-1">WPM</div>
+        </div>
+        <div>
+          <div className="font-display text-display-md text-ink-900">0</div>
+          <div className="pixel-eyebrow text-ink-400 pt-1">Dictations</div>
+        </div>
+      </div>
+      <SegmentedLoader mode="progress" progress={0} />
+    </EditorialCard>
+  );
+}
+
+// ─── TASKS ─────────────────────────────────────────────────────────
+
+function TasksTab() {
+  return (
+    <div className="px-10 py-9" style={{ maxWidth: 1100 }}>
+      <TabHeader
+        eyebrow="Tasks"
+        title="Floe Agent, "
+        italic="working."
+      />
+      <EditorialCard>
+        <p className="text-ink-600 leading-relaxed" style={{ fontSize: 14 }}>
+          Background agent tasks aren't enabled in the Windows build yet.
+          The Mac app uses AppleScript + Calendar + Mail + Messages to
+          run multi-step automations; the Windows equivalent (Outlook
+          COM + UI Automation) is in the roadmap — see <code>docs/PORT-NOTES.md</code>.
+        </p>
+        <p className="text-ink-600 pt-2" style={{ fontSize: 13 }}>
+          For now, the pill chat + dictation + interview + Clicky
+          pointer modes all work.
+        </p>
+      </EditorialCard>
     </div>
   );
 }
 
-function Settings({ settings }: { settings: AppSettings }) {
-  const [draft, setDraft] = useState(settings);
-  useEffect(() => setDraft(settings), [settings]);
+// ─── PROFILE ───────────────────────────────────────────────────────
 
-  const save = async (patch: Partial<AppSettings>) => {
+function ProfileTab() {
+  const [resume, setResume] = useState('');
+  // For the MVP we surface a local résumé text area that interview
+  // mode reads. Full ProfilesView (Mac) supports multiple profiles +
+  // JD attachments — slated for v0.2.
+  useEffect(() => {
+    const stored = localStorage.getItem('keyfloe.resume') ?? '';
+    setResume(stored);
+  }, []);
+  function save(next: string) {
+    setResume(next);
+    localStorage.setItem('keyfloe.resume', next);
+  }
+  return (
+    <div className="px-10 py-9 flex flex-col gap-6" style={{ maxWidth: 1100 }}>
+      <TabHeader
+        eyebrow="Profile"
+        title="Who you are, "
+        italic="to Keyfloe."
+      />
+      <EditorialCard>
+        <SectionHeading title="Résumé / Notes" />
+        <p className="text-ink-600 pb-2" style={{ fontSize: 13.5 }}>
+          Anything you paste here goes into the system prompt for
+          "How do I answer this?" during interview mode. Plain text,
+          markdown, or bullet points all work.
+        </p>
+        <textarea
+          value={resume}
+          onChange={(e) => save(e.target.value)}
+          placeholder="Paste your résumé, bullet-list your strengths, or jot down anything you'd want Keyfloe to remember about you in interviews…"
+          className="w-full bg-paper text-ink-900 border border-hairline p-3 font-sans"
+          style={{ minHeight: 240, resize: 'vertical', fontSize: 13.5, lineHeight: 1.55 }}
+        />
+      </EditorialCard>
+    </div>
+  );
+}
+
+// ─── DICTATIONS ────────────────────────────────────────────────────
+
+interface DictationEntry { id: string; text: string; recordedAt: number; durationSec: number; pastedInto?: string; }
+
+function DictationsTab() {
+  const [entries, setEntries] = useState<DictationEntry[]>([]);
+  const [search, setSearch] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  useEffect(() => {
+    const stored = JSON.parse(localStorage.getItem('keyfloe.dictations') ?? '[]') as DictationEntry[];
+    setEntries(stored);
+    const onUpdate = () => {
+      const next = JSON.parse(localStorage.getItem('keyfloe.dictations') ?? '[]') as DictationEntry[];
+      setEntries(next);
+    };
+    window.addEventListener('storage', onUpdate);
+    const off = window.keyfloe.voice.onState((s) => {
+      if (s.kind === 'idle') onUpdate();
+    });
+    return () => { window.removeEventListener('storage', onUpdate); off(); };
+  }, []);
+
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? entries.filter((e) => e.text.toLowerCase().includes(q)
+                         || (e.pastedInto?.toLowerCase().includes(q) ?? false))
+    : entries;
+
+  function copy(entry: DictationEntry) {
+    navigator.clipboard.writeText(entry.text);
+    setCopiedId(entry.id);
+    setTimeout(() => setCopiedId((id) => id === entry.id ? null : id), 1500);
+  }
+  function remove(entry: DictationEntry) {
+    const next = entries.filter((e) => e.id !== entry.id);
+    setEntries(next);
+    localStorage.setItem('keyfloe.dictations', JSON.stringify(next));
+  }
+  function clearAll() {
+    setEntries([]);
+    localStorage.setItem('keyfloe.dictations', '[]');
+  }
+
+  return (
+    <div className="px-10 py-9 flex flex-col gap-6" style={{ maxWidth: 1100 }}>
+      <div className="flex items-end justify-between">
+        <div className="flex flex-col gap-1.5">
+          <EditorialEyebrow text="Dictations" />
+          <DisplayTitle leading="Every transcript, " italic="saved." size="md" />
+        </div>
+        {entries.length > 0 && (
+          <EditorialButton label="Clear all" destructive onClick={clearAll} />
+        )}
+      </div>
+
+      {entries.length === 0 ? (
+        <EditorialCard>
+          <h3 className="text-ink-900" style={{ fontSize: 16, fontWeight: 500 }}>
+            Nothing dictated yet
+          </h3>
+          <p className="text-ink-600 leading-relaxed" style={{ fontSize: 14 }}>
+            Hold your activation key and speak. Every transcript will
+            appear here so you can copy it back if it landed in the
+            wrong place. Auto-prunes after 30 days.
+          </p>
+        </EditorialCard>
+      ) : (
+        <>
+          <div className="panel-sculpted px-3 py-2.5 flex items-center gap-2">
+            <span className="text-ink-600">🔍</span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search dictations…"
+              className="flex-1 bg-transparent text-ink-900 outline-none"
+              style={{ fontSize: 14 }}
+            />
+          </div>
+          <div className="flex flex-col gap-3">
+            {filtered.map((entry) => (
+              <EditorialCard key={entry.id} inset={14}>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="text-ink-600" style={{ fontSize: 11, fontWeight: 500 }}>
+                    {new Date(entry.recordedAt).toLocaleString()}
+                  </span>
+                  {entry.pastedInto && (
+                    <span className="text-ink-400 border border-hairline px-1.5 py-0.5"
+                          style={{ fontSize: 11 }}>
+                      {entry.pastedInto}
+                    </span>
+                  )}
+                  <span className="text-ink-400" style={{ fontSize: 11 }}>
+                    {formatDuration(entry.durationSec)}
+                  </span>
+                  <div className="flex-1" />
+                  <button
+                    onClick={() => copy(entry)}
+                    className="border border-hairline px-2 py-0.5 text-ink-900"
+                    style={{ fontSize: 11, fontWeight: 500 }}
+                  >
+                    {copiedId === entry.id ? 'Copied!' : 'Copy'}
+                  </button>
+                  <button
+                    onClick={() => remove(entry)}
+                    className="border border-hairline w-[22px] h-[22px] text-ink-400 flex items-center justify-center"
+                    style={{ fontSize: 10 }}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <p
+                  className="text-ink-900 select-text whitespace-pre-wrap pt-2"
+                  style={{ fontSize: 13 }}
+                >
+                  {entry.text}
+                </p>
+              </EditorialCard>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function formatDuration(s: number): string {
+  if (s < 60) return `${s.toFixed(1)}s`;
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return `${m}m ${sec}s`;
+}
+
+// ─── CONVERSATIONS ─────────────────────────────────────────────────
+
+function ConversationsTab() {
+  return (
+    <div className="px-10 py-9 flex flex-col gap-6" style={{ maxWidth: 1100 }}>
+      <div className="flex flex-col gap-1.5">
+        <EditorialEyebrow text="Conversations" />
+        <DisplayTitle leading="Every chat, " italic="kept." size="md" />
+      </div>
+      <EditorialDivider />
+      <EditorialCard>
+        <h3 className="text-ink-900" style={{ fontSize: 16, fontWeight: 500 }}>
+          No conversations yet
+        </h3>
+        <p className="text-ink-600 leading-relaxed" style={{ fontSize: 14 }}>
+          Tap Right-Ctrl to open the pill and ask anything. Each chat
+          shows up here as a row.
+        </p>
+      </EditorialCard>
+    </div>
+  );
+}
+
+// ─── BILLING ───────────────────────────────────────────────────────
+
+function BillingTab() {
+  return (
+    <div className="px-10 py-9 flex flex-col gap-6" style={{ maxWidth: 880 }}>
+      <TabHeader
+        eyebrow="Billing"
+        trailingEyebrow="Three editions"
+        title="Pick a "
+        italic="tier."
+      />
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { name: 'Free',  price: '$0',  features: ['15 chat turns / day', 'Cloud Whisper', 'Right-Ctrl tap / hold'] },
+          { name: 'Hobby', price: '$9',  features: ['Unlimited chat', 'Cloud Whisper', 'Interview mode'] },
+          { name: 'Pro',   price: '$24', features: ['Everything in Hobby', 'Priority routing', 'Stealth mode', 'Sonnet for chat'] },
+        ].map((tier) => (
+          <EditorialCard key={tier.name}>
+            <EditorialEyebrow text={tier.name} />
+            <DisplayTitle leading={tier.price} italic=" / mo" size="md" />
+            <ul className="flex flex-col gap-1.5 pt-2">
+              {tier.features.map((f) => (
+                <li key={f} className="text-ink-600" style={{ fontSize: 13.5 }}>
+                  · {f}
+                </li>
+              ))}
+            </ul>
+            <div className="pt-3">
+              <EditorialButton
+                label={tier.name === 'Free' ? 'Current' : 'Coming soon'}
+                solid={tier.name !== 'Free'}
+                onClick={() => undefined}
+              />
+            </div>
+          </EditorialCard>
+        ))}
+      </div>
+      <p className="text-ink-400 pt-4" style={{ fontSize: 12 }}>
+        Billing flows route through the same Lemon Squeezy webhook the
+        Mac app uses. Wire-up is on the v0.2 milestone.
+      </p>
+    </div>
+  );
+}
+
+// ─── SETTINGS ──────────────────────────────────────────────────────
+
+function SettingsTab() {
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  useEffect(() => {
+    window.keyfloe.settings.get().then(setSettings);
+    const off = window.keyfloe.settings.onChange(setSettings);
+    return () => off();
+  }, []);
+  async function save(patch: Partial<AppSettings>) {
     const next = await window.keyfloe.settings.set(patch);
-    setDraft(next);
-  };
+    setSettings(next);
+  }
+  if (!settings) return <div className="p-10 text-ink-600">Loading…</div>;
 
   const keys: ActivationKey[] = ['RightCtrl', 'RightAlt', 'CapsLock', 'F8'];
 
   return (
-    <div className="flex flex-col gap-8 max-w-2xl">
-      <Group title="Activation" subtitle="The key Keyfloe watches for tap (open pill) and hold (dictate).">
-        <div className="flex gap-2">
-          {keys.map((k) => (
-            <button
-              key={k}
-              onClick={() => save({ activationKey: k })}
-              className={[
-                'px-3 py-2 rounded-md text-sm border',
-                draft.activationKey === k
-                  ? 'bg-accent-600 border-accent-600 text-white'
-                  : 'bg-bg-1 border-border-subtle text-text-primary hover:bg-bg-2',
-              ].join(' ')}
-            >
-              {k}
-            </button>
-          ))}
-        </div>
-        <Hint>
-          Windows laptops have an Fn key, but the firmware (EC) consumes it before the OS sees it,
-          so software can't reliably hook it. Right-Ctrl is the closest analog.
-        </Hint>
-      </Group>
+    <div className="px-10 py-9 flex flex-col gap-0" style={{ maxWidth: 880 }}>
+      <TabHeader
+        eyebrow="Settings"
+        trailingEyebrow="Configure"
+        title="Make it "
+        italic="yours."
+      />
 
-      <Group title="Whisper model" subtitle="On-device speech-to-text. Larger = more accurate, slower.">
-        <select
-          value={draft.whisperModel}
-          onChange={(e) => save({ whisperModel: e.target.value as AppSettings['whisperModel'] })}
-          className="bg-bg-1 border border-border-subtle rounded-md px-3 py-2 text-sm text-text-primary"
-        >
-          <option value="tiny">Tiny (75 MB, fastest)</option>
-          <option value="base">Base (150 MB)</option>
-          <option value="small">Small (500 MB)</option>
-          <option value="medium">Medium (1.5 GB)</option>
-          <option value="large-v3-turbo">Large v3 Turbo (1.6 GB, best)</option>
-        </select>
-      </Group>
+      <div className="flex flex-col gap-14">
 
-      <Group title="Worker URL" subtitle="Backend that proxies Claude + Whisper. Override to point at a local wrangler dev.">
-        <input
-          type="text"
-          value={draft.workerUrl}
-          onChange={(e) => setDraft({ ...draft, workerUrl: e.target.value })}
-          onBlur={() => save({ workerUrl: draft.workerUrl })}
-          className="w-full bg-bg-1 border border-border-subtle rounded-md px-3 py-2 text-sm font-mono text-text-primary"
-        />
-      </Group>
+        <EditorialCard>
+          <SectionHeading title="Activation " italic="key." />
+          <p className="text-ink-600" style={{ fontSize: 14 }}>
+            Pick which key opens Keyfloe. Press once for the chat pill,
+            hold to dictate.
+          </p>
+          <div className="flex gap-2 pt-2 flex-wrap">
+            {keys.map((k) => {
+              const active = settings.activationKey === k;
+              return (
+                <button
+                  key={k}
+                  onClick={() => save({ activationKey: k })}
+                  className={[
+                    'editorial-button app-no-drag',
+                    active ? 'solid' : '',
+                  ].join(' ')}
+                >
+                  {k.toUpperCase()}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-ink-400 pt-2" style={{ fontSize: 12 }}>
+            Windows laptops have an Fn key, but firmware (the EC) consumes
+            it before the OS sees it, so software hooks can't read it.
+            Right-Ctrl is the closest analog.
+          </p>
+        </EditorialCard>
 
-      <Group title="Direct API keys (optional)" subtitle="If set, bypass the Worker and call Anthropic / OpenAI directly.">
-        <KeyField
-          label="Anthropic API key"
-          value={draft.anthropicApiKey ?? ''}
-          onChange={(v) => save({ anthropicApiKey: v || null })}
-        />
-        <KeyField
-          label="OpenAI API key (for Whisper)"
-          value={draft.openaiApiKey ?? ''}
-          onChange={(v) => save({ openaiApiKey: v || null })}
-        />
-      </Group>
+        <EditorialCard>
+          <SectionHeading title="Speech " italic="model." />
+          <p className="text-ink-600" style={{ fontSize: 14 }}>
+            Whisper is run on the Cloudflare Worker for now. On-device
+            whisper.cpp with DirectML acceleration is in the roadmap.
+          </p>
+          <select
+            value={settings.whisperModel}
+            onChange={(e) => save({ whisperModel: e.target.value as AppSettings['whisperModel'] })}
+            className="border border-hairline bg-paper text-ink-900 px-3 py-2 mt-2"
+            style={{ fontSize: 14 }}
+          >
+            <option value="tiny">Tiny (75 MB, fastest)</option>
+            <option value="base">Base (150 MB)</option>
+            <option value="small">Small (500 MB)</option>
+            <option value="medium">Medium (1.5 GB)</option>
+            <option value="large-v3-turbo">Large v3 Turbo (1.6 GB, best)</option>
+          </select>
+        </EditorialCard>
 
-      <Group title="Privacy" subtitle="Stealth mode hides the pill + cursor overlay from screen recordings.">
-        <label className="flex items-center gap-2 text-sm">
+        <EditorialCard>
+          <SectionHeading title="Stealth " italic="mode." />
+          <p className="text-ink-600" style={{ fontSize: 14 }}>
+            Hides the pill and cursor overlay from screen recordings.
+          </p>
+          <label className="flex items-center gap-2 pt-2 text-ink-900" style={{ fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={settings.stealthMode}
+              onChange={(e) => save({ stealthMode: e.target.checked })}
+            />
+            Enable stealth mode
+          </label>
+        </EditorialCard>
+
+        <EditorialCard>
+          <SectionHeading title="API " italic="keys." />
+          <p className="text-ink-600" style={{ fontSize: 14 }}>
+            Optional. If set, Keyfloe calls Anthropic / OpenAI directly
+            and bypasses the Cloudflare Worker's free-tier quota.
+          </p>
+          <div className="flex flex-col gap-2 pt-2">
+            <KeyField
+              label="Anthropic API key"
+              value={settings.anthropicApiKey ?? ''}
+              onChange={(v) => save({ anthropicApiKey: v || null })}
+            />
+            <KeyField
+              label="OpenAI API key (for Whisper)"
+              value={settings.openaiApiKey ?? ''}
+              onChange={(v) => save({ openaiApiKey: v || null })}
+            />
+          </div>
+        </EditorialCard>
+
+        <EditorialCard>
+          <SectionHeading title="Worker " italic="URL." />
+          <p className="text-ink-600" style={{ fontSize: 14 }}>
+            Backend that proxies Claude + Whisper. Override to point
+            at a local <code>wrangler dev</code>.
+          </p>
           <input
-            type="checkbox"
-            checked={draft.stealthMode}
-            onChange={(e) => save({ stealthMode: e.target.checked })}
+            type="text"
+            defaultValue={settings.workerUrl}
+            onBlur={(e) => save({ workerUrl: e.target.value })}
+            className="w-full border border-hairline bg-paper text-ink-900 px-3 py-2 mt-2 font-pixel"
+            style={{ fontSize: 13 }}
           />
-          Enable stealth mode
-        </label>
-      </Group>
+        </EditorialCard>
+      </div>
     </div>
-  );
-}
-
-function About() {
-  return (
-    <div className="max-w-2xl text-sm text-text-secondary flex flex-col gap-4">
-      <h1 className="text-2xl text-text-primary font-medium">Keyfloe for Windows</h1>
-      <p>
-        Windows port of <a className="text-accent-400" href="https://github.com/danlhw/keyfloe" target="_blank" rel="noreferrer">danlhw/keyfloe</a>,
-        the native macOS AI companion. Built on Electron + React + TypeScript, with the same Cloudflare Worker backend.
-      </p>
-      <p className="text-text-tertiary">
-        Three modes: chat pill anchored to the cursor, push-to-talk dictation, and live interview helper with system-audio loopback.
-      </p>
-      <p className="text-text-tertiary text-xs">
-        © 2026 Onefloe. UNLICENSED.
-      </p>
-    </div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-bg-1 border border-border-subtle rounded-lg px-4 py-3">
-      <div className="text-text-tertiary text-xs uppercase tracking-wider">{label}</div>
-      <div className="text-xl text-text-primary mt-1 font-mono">{value}</div>
-    </div>
-  );
-}
-
-function Group({ title, subtitle, children }: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-text-primary text-base font-medium">{title}</h2>
-      {subtitle && <p className="text-text-tertiary text-xs -mt-1">{subtitle}</p>}
-      <div className="flex flex-col gap-2 mt-1">{children}</div>
-    </section>
-  );
-}
-
-function Kbd({ children }: { children: React.ReactNode }) {
-  return (
-    <kbd className="px-1.5 py-0.5 mx-0.5 text-xs bg-bg-2 border border-border-subtle rounded font-mono text-text-primary">
-      {children}
-    </kbd>
-  );
-}
-
-function Hint({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-text-tertiary text-xs leading-snug">{children}</p>
   );
 }
 
 function KeyField({ label, value, onChange }: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
+  label: string; value: string; onChange: (v: string) => void;
 }) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="text-text-secondary text-xs">{label}</span>
+    <label className="flex flex-col gap-1">
+      <span className="pixel-eyebrow text-ink-600">{label}</span>
       <input
         type="password"
         value={v}
         onChange={(e) => setV(e.target.value)}
         onBlur={() => onChange(v)}
         placeholder="paste key, leave empty to use the Worker"
-        className="bg-bg-1 border border-border-subtle rounded-md px-3 py-2 text-sm font-mono text-text-primary placeholder:text-text-tertiary"
+        className="border border-hairline bg-paper text-ink-900 px-3 py-2 font-pixel"
+        style={{ fontSize: 13 }}
       />
     </label>
   );
 }
 
-function time() {
-  return new Date().toLocaleTimeString();
-}

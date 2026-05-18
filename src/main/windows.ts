@@ -1,64 +1,84 @@
-import { BrowserWindow, screen, Display, app } from 'electron';
+import { BrowserWindow, screen, Display, ipcMain } from 'electron';
 import path from 'node:path';
 import { logger } from './log';
 import { preloadPath } from './index';
+import { IPC } from '../shared/ipc';
 
-// One owner for every window Keyfloe creates: dashboard (regular),
-// pill (frameless, follows cursor), overlay (transparent click-through,
-// covers every screen). Renderer entry points are separate HTML files
-// emitted by Vite under dist/renderer/.
+// Three classes of window:
+//   notch    — pinned top-center, frameless transparent, always on top.
+//              Hosts the notch shell (idle / hoverCompact / expandedFull).
+//   pill     — frameless transparent, anchored to the cursor on tap.
+//   overlay  — one per display, transparent click-through, hosts the
+//              Clicky blue cursor + speech bubble.
+//
+// Renderer entry points are separate HTML files emitted by Vite under
+// dist/renderer/.
 
-const DEV_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
-const IS_DEV = !app.isPackaged;
+const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 
-function rendererUrl(page: 'dashboard' | 'pill' | 'overlay'): string {
-  if (IS_DEV) return `${DEV_URL}/${page}.html`;
+function rendererUrl(page: 'notch' | 'dashboard' | 'pill' | 'overlay'): string {
+  if (DEV_URL) return `${DEV_URL}/${page}.html`;
   return `file://${path.join(__dirname, '..', 'renderer', `${page}.html`)}`;
 }
+
+// Notch geometry mirrored from NotchGeometry.swift. Lip dimensions and
+// the three state-size profiles need to stay in lockstep with the
+// renderer (see src/renderer/views/Notch.tsx).
+const NOTCH_WIDTH  = 200;
+const NOTCH_HEIGHT = 32;
+type NotchState = 'idle' | 'hoverCompact' | 'expandedFull';
+const NOTCH_SIZES: Record<NotchState, { width: number; height: number }> = {
+  idle:         { width: NOTCH_WIDTH, height: NOTCH_HEIGHT },
+  hoverCompact: { width: 420,         height: 110 },
+  expandedFull: { width: 980,         height: 660 },
+};
 
 export class WindowManager {
   static shared = new WindowManager();
 
-  private dashboard: BrowserWindow | null = null;
+  private notch: BrowserWindow | null = null;
   private pill: BrowserWindow | null = null;
   private overlays: BrowserWindow[] = [];
 
   build() {
-    // Pre-create pill so the first hotkey press paints instantly. The
-    // Mac app does the same with NSPanel — keep one hidden in memory
-    // and just show/hide on toggle rather than rebuilding the WebContents.
+    // The notch is the primary surface — it owns the dashboard. The pill
+    // is created lazily on first hotkey press. Overlays are one per
+    // display, always painted but transparent + click-through.
+    this.createNotch();
     this.pill = this.createPill();
     this.createOverlaysForAllDisplays();
 
-    // Rebuild overlays when displays change (monitor plug/unplug, lid
-    // close on laptop, resolution flip after game launch).
-    screen.on('display-added',   () => this.createOverlaysForAllDisplays());
-    screen.on('display-removed', () => this.createOverlaysForAllDisplays());
-    screen.on('display-metrics-changed', () => this.createOverlaysForAllDisplays());
+    // Reposition the notch and rebuild overlays when the display
+    // topology changes (lid open/close, monitor plug, resolution flip).
+    screen.on('display-added',           () => { this.repositionNotch(); this.createOverlaysForAllDisplays(); });
+    screen.on('display-removed',         () => { this.repositionNotch(); this.createOverlaysForAllDisplays(); });
+    screen.on('display-metrics-changed', () => { this.repositionNotch(); this.createOverlaysForAllDisplays(); });
+
+    ipcMain.handle(IPC.notchSetState, (_e, payload: { state: NotchState; width: number; height: number }) => {
+      this.resizeNotch(payload.width, payload.height);
+    });
   }
 
-  // MARK: dashboard
+  // ─── Notch (the primary, always-on-top top-of-screen surface) ───
 
-  openDashboard() {
-    if (this.dashboard && !this.dashboard.isDestroyed()) {
-      this.focusDashboard();
-      return;
-    }
+  private createNotch() {
+    const primary = screen.getPrimaryDisplay();
+    const size = NOTCH_SIZES.idle;
+    const { x, y } = this.notchOrigin(primary, size);
     const win = new BrowserWindow({
-      width: 1100,
-      height: 720,
-      minWidth: 720,
-      minHeight: 480,
-      title: 'Keyfloe',
-      backgroundColor: '#101211',
-      // Custom title bar — matches the Mac dashboard's traffic-light area.
-      titleBarStyle: 'hidden',
-      titleBarOverlay: {
-        color: '#171918',
-        symbolColor: '#ECEEED',
-        height: 36,
-      },
-      show: false,
+      x, y,
+      width: size.width,
+      height: size.height,
+      frame: false,
+      transparent: true,
+      hasShadow: false,
+      resizable: false,
+      movable: false,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      focusable: true,
+      show: true,
+      backgroundColor: '#00000000',
       webPreferences: {
         preload: preloadPath(),
         contextIsolation: true,
@@ -66,22 +86,54 @@ export class WindowManager {
         sandbox: false,
       },
     });
-    win.once('ready-to-show', () => win.show());
-    win.loadURL(rendererUrl('dashboard'));
-    win.on('closed', () => { this.dashboard = null; });
-    this.dashboard = win;
+    win.setAlwaysOnTop(true, 'screen-saver');
+    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    win.loadURL(rendererUrl('notch'));
+    win.on('closed', () => { this.notch = null; });
+    this.notch = win;
+  }
+
+  private notchOrigin(display: Display, size: { width: number; height: number }) {
+    // Centered along the top edge of the primary display's *bounds*
+    // (not work area) so it visually replaces the menu-bar/title-area
+    // strip the way the Mac notch does.
+    const x = Math.round(display.bounds.x + (display.bounds.width - size.width) / 2);
+    const y = display.bounds.y;
+    return { x, y };
+  }
+
+  private repositionNotch() {
+    if (!this.notch || this.notch.isDestroyed()) return;
+    const primary = screen.getPrimaryDisplay();
+    const [w, h] = this.notch.getSize();
+    const { x, y } = this.notchOrigin(primary, { width: w, height: h });
+    this.notch.setPosition(x, y);
+  }
+
+  private resizeNotch(width: number, height: number) {
+    if (!this.notch || this.notch.isDestroyed()) return;
+    const [w, h] = this.notch.getSize();
+    if (Math.abs(w - width) < 2 && Math.abs(h - height) < 2) return;
+    const primary = screen.getPrimaryDisplay();
+    const { x, y } = this.notchOrigin(primary, { width, height });
+    this.notch.setBounds({ x, y, width: Math.round(width), height: Math.round(height) });
   }
 
   focusDashboard() {
-    if (!this.dashboard || this.dashboard.isDestroyed()) {
-      this.openDashboard();
-      return;
+    // "Open the dashboard" from the tray = grow the notch to expandedFull.
+    // We just bring the notch window forward and ping the renderer; the
+    // renderer flips its internal state machine.
+    if (!this.notch || this.notch.isDestroyed()) {
+      this.createNotch();
     }
-    if (this.dashboard.isMinimized()) this.dashboard.restore();
-    this.dashboard.focus();
+    this.notch?.show();
+    this.notch?.focus();
+    // The renderer subscribes to this so the user gets the dashboard
+    // open immediately, even though they didn't hover.
+    this.notch?.webContents.send('notch:request-expand');
   }
 
-  // MARK: pill
+  // ─── Pill (cursor-anchored chat) ────────────────────────────────
 
   private createPill(): BrowserWindow {
     const win = new BrowserWindow({
@@ -97,10 +149,6 @@ export class WindowManager {
       alwaysOnTop: true,
       focusable: true,
       show: false,
-      // Vibrancy on Windows is faked in CSS (backdrop-filter: blur) since
-      // there's no system-wide vibrancy material like NSVisualEffectView.
-      // We set a transparent background and let the renderer paint its
-      // own pill body.
       backgroundColor: '#00000000',
       webPreferences: {
         preload: preloadPath(),
@@ -112,11 +160,6 @@ export class WindowManager {
     win.setAlwaysOnTop(true, 'screen-saver');
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     win.loadURL(rendererUrl('pill'));
-    win.on('blur', () => {
-      // Mac pill stays open when it loses focus; matches that behavior.
-      // The user closes it via Escape or by clicking outside + the
-      // dismiss button, never just by clicking off it.
-    });
     return win;
   }
 
@@ -151,8 +194,6 @@ export class WindowManager {
     const cursor = screen.getCursorScreenPoint();
     const display = screen.getDisplayNearestPoint(cursor);
     const [w, h] = this.pill.getSize();
-    // Mac centers the pill under the cursor with a 24pt drop. Mirror that
-    // here, clamped to the work area so it never paints under the taskbar.
     const x = Math.min(
       Math.max(cursor.x - Math.floor(w / 2), display.workArea.x + 8),
       display.workArea.x + display.workArea.width - w - 8,
@@ -164,7 +205,7 @@ export class WindowManager {
     this.pill.setPosition(x, y);
   }
 
-  // MARK: overlays (clicky)
+  // ─── Overlays (Clicky cursor + speech bubble) ───────────────────
 
   private createOverlaysForAllDisplays() {
     this.overlays.forEach((w) => { if (!w.isDestroyed()) w.destroy(); });
@@ -204,13 +245,9 @@ export class WindowManager {
 
   overlayWindows() { return this.overlays.filter((w) => !w.isDestroyed()); }
 
-  // MARK: screen capture
+  // ─── Screen capture (per-display, sent into Claude as the per-turn image) ─
 
   async captureScreen(display: Display): Promise<string | null> {
-    // desktopCapturer is available from the main process but the cleaner
-    // path on modern Electron is webContents.capturePage on a hidden
-    // window. For now we use desktopCapturer because we want the actual
-    // screen content (apps, taskbar) rather than our own DOM.
     const { desktopCapturer } = await import('electron');
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
@@ -223,12 +260,7 @@ export class WindowManager {
       return null;
     }
     const img = match.thumbnail;
-    // Shrink to ~1280 wide before sending to Claude — vision tokens are
-    // priced by image area, and Claude grounds coordinates against the
-    // image it receives so we have to remember the scale ratio at the
-    // call site to map them back onto the real screen.
     const resized = img.resize({ width: Math.min(1280, img.getSize().width) });
     return resized.toDataURL();
   }
 }
-

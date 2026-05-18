@@ -1,22 +1,28 @@
+/**
+ * Cursor-anchored chat pill — port of Pill/PillView.swift. Reads the
+ * same warm-paper palette as the dashboard so it visually belongs to
+ * Keyfloe (not a generic dark Electron overlay).
+ *
+ * Three modes share this surface:
+ *   • Idle chat — text input, streaming reply with screen context,
+ *     suggestion chips on the home view.
+ *   • Dictation — when hold-to-record fires from main, the mic
+ *     waveform pulses; on release the WAV is shipped to main for
+ *     transcription + paste.
+ *   • Interview — toggle in the toolbar starts mic + WASAPI loopback;
+ *     rolling transcript replaces the chat area when bodyMode = 'transcript';
+ *     the "How do I answer?" button drops a Claude verbatim reply into
+ *     the chat as an assistant bubble.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChatMessage, InterviewState, VoiceUIState } from '@shared/types';
 import { v4 as uuid } from 'uuid';
 import { BubbleRow } from '../components/BubbleRow';
 import { MicWaveform } from '../components/MicWaveform';
 import { InterviewTranscript } from '../components/InterviewTranscript';
+import { EditorialEyebrow } from '../components/editorial';
 import { MicRecorder, b64encode } from '../audio/MicRecorder';
 import { SystemAudioRecorder } from '../audio/SystemAudioRecorder';
-
-// Port of Pill/PillView.swift — the floating chat pill. iMessage-style
-// glass surface anchored to the user's cursor. Three modes share this
-// surface:
-//
-//   • Idle chat — text input, send → streaming reply with screen context.
-//   • Dictation — hold the activation key; mic waveform pulses; release
-//     transcribes via Worker and pastes into the focused field.
-//   • Interview — toggle button on the input row; rolling live
-//     transcript replaces the chat area; "How do I answer?" button
-//     drops the verbatim reply into the chat as an assistant bubble.
 
 type BodyMode = 'chat' | 'transcript';
 
@@ -37,9 +43,9 @@ export function Pill() {
   const recorderRef = useRef<MicRecorder | null>(null);
   const sysRecorderRef = useRef<SystemAudioRecorder | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const endRef = useRef<HTMLDivElement | null>(null);
 
-  // ─── IPC wires ──────────────────────────────────────────────────
+  // ─── IPC wires ───────────────────────────────────────────────────
 
   useEffect(() => {
     const off1 = window.keyfloe.voice.onState(setVoice);
@@ -73,8 +79,9 @@ export function Pill() {
     return () => { off1(); off2(); off3(); off4(); off5(); };
   }, []);
 
-  // Dictation: main asks us to record / stop. We run a MicRecorder one-shot
-  // and push the WAV back via voice.pushWav so main can transcribe + paste.
+  // Dictation: main asks to record / stop. We push the encoded WAV back
+  // and persist a dictations entry to localStorage so the Dashboard's
+  // Dictations tab can show it.
   useEffect(() => {
     const offBegin = window.keyfloe.voice.onBegin(async () => {
       try {
@@ -104,8 +111,9 @@ export function Pill() {
     return () => { offBegin(); offEnd(); offAbort(); };
   }, []);
 
-  // Interview mode: main fires interview:begin → we open the mic +
-  // (try to) open system-audio loopback. We push 4 s chunks per channel.
+  // Interview mode: dual capture mic + WASAPI loopback (Mac's
+  // ScreenCaptureKit equivalent in Chromium). Each side pushes 4 s
+  // chunks; main transcribes + gates via cross-channel mic suppression.
   useEffect(() => {
     const offBegin = window.keyfloe.interview.onBegin(async () => {
       try {
@@ -113,10 +121,7 @@ export function Pill() {
         mic.onLevel = (l) => window.keyfloe.interview.pushMicLevel(l);
         mic.onChunk = async (wav, durationMs, rms) => {
           await window.keyfloe.interview.pushChunk({
-            role: 'Me',
-            wavBase64: b64encode(wav),
-            durationMs,
-            rms,
+            role: 'Me', wavBase64: b64encode(wav), durationMs, rms,
           });
         };
         await mic.startContinuous(4000);
@@ -128,16 +133,12 @@ export function Pill() {
         const sys = new SystemAudioRecorder();
         sys.onChunk = async (wav, durationMs, rms) => {
           await window.keyfloe.interview.pushChunk({
-            role: 'Interviewer',
-            wavBase64: b64encode(wav),
-            durationMs,
-            rms,
+            role: 'Interviewer', wavBase64: b64encode(wav), durationMs, rms,
           });
         };
         await sys.start(4000);
         sysRecorderRef.current = sys;
       } catch (err) {
-        // System audio is optional — without it we still get mic-only.
         console.warn('interview: system audio unavailable', err);
       }
       setBodyMode('transcript');
@@ -150,27 +151,49 @@ export function Pill() {
     return () => { offBegin(); offEnd(); };
   }, []);
 
-  // Auto-resize the pill window to fit the rendered content. Use a
-  // ResizeObserver on the outer container.
+  // Persist successful dictations to localStorage for the Dashboard
+  // tab. We listen for voice.state transitioning to .idle right after
+  // a clipboard write; transcript text isn't sent to the renderer
+  // (main does the paste), so the renderer reads the clipboard.
+  useEffect(() => {
+    if (voice.kind !== 'idle') return;
+    const ts = Date.now();
+    setTimeout(async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        const stored = JSON.parse(localStorage.getItem('keyfloe.dictations') ?? '[]');
+        // Don't record duplicates — if the last entry's text matches, skip.
+        if (stored[0]?.text === text || !text || text.length > 4000) return;
+        const entry = {
+          id: uuid(), text, recordedAt: ts, durationSec: 0,
+        };
+        const next = [entry, ...stored].slice(0, 200);
+        localStorage.setItem('keyfloe.dictations', JSON.stringify(next));
+        window.dispatchEvent(new Event('storage'));
+      } catch { /* clipboard might not be permitted */ }
+    }, 250);
+  }, [voice]);
+
+  // Auto-resize the pill window to fit the rendered content.
   useEffect(() => {
     const el = document.getElementById('pill-root');
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const cr = entry.contentRect;
-        // Outer padding + a small gutter so the shadow isn't clipped.
-        window.keyfloe.pill.resize(Math.ceil(cr.width + 24), Math.ceil(cr.height + 24));
+        window.keyfloe.pill.resize(
+          Math.ceil(cr.width + 24),
+          Math.ceil(cr.height + 24),
+        );
       }
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  // Always keep input focus when the pill is visible.
   useEffect(() => { inputRef.current?.focus(); }, []);
-
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages]);
 
   // ─── Submit / streaming ─────────────────────────────────────────
@@ -181,7 +204,6 @@ export function Pill() {
     setLastError(null);
     setSubmitting(true);
     setQuery('');
-
     const userMsg: ChatMessage = {
       id: uuid(), role: 'user', text: trimmed, createdAt: Date.now(),
     };
@@ -190,10 +212,7 @@ export function Pill() {
     };
     const priorHistory = messages.map((m) => ({ role: m.role, content: m.text }));
     setMessages((prev) => [...prev, userMsg, assistant]);
-
-    // Grab a fresh screenshot so Claude has screen context per turn.
     const shot = await window.keyfloe.capture.screen().catch(() => null);
-
     const streamId = await window.keyfloe.chat.stream({
       system: SYSTEM_PROMPT,
       history: priorHistory,
@@ -221,11 +240,8 @@ export function Pill() {
   }, []);
 
   const toggleInterview = useCallback(async () => {
-    if (interview.isRunning) {
-      await window.keyfloe.interview.stop();
-    } else {
-      await window.keyfloe.interview.start();
-    }
+    if (interview.isRunning) await window.keyfloe.interview.stop();
+    else                     await window.keyfloe.interview.start();
   }, [interview.isRunning]);
 
   const askInterviewAnswer = useCallback(async () => {
@@ -259,80 +275,86 @@ export function Pill() {
   }, [voice]);
 
   return (
-    <div className="w-screen h-screen p-3 app-drag">
+    <div className="w-screen h-screen p-3 app-drag" style={{ background: 'transparent' }}>
       <div
         id="pill-root"
-        className="pill-glass rounded-pill px-4 py-3 flex flex-col gap-2 min-w-[360px]"
-        style={{ width: 'fit-content', maxWidth: 'calc(100vw - 24px)' }}
+        className="panel-sculpted flex flex-col gap-2.5 relative"
+        style={{
+          minWidth: 360,
+          maxWidth: 'calc(100vw - 24px)',
+          width: 'fit-content',
+          padding: 14,
+          borderRadius: 22,
+          background: 'var(--paper)',
+        }}
       >
-        {/* Dot-grid overlay sits on top of the glass for the same
-            paper-fill texture the Mac pill has. */}
-        <div className="dot-grid pointer-events-none absolute inset-3 rounded-pill" />
-
         {/* Status header — interview toggle, dictation status, pro star */}
-        <div className="flex items-center justify-between gap-2 z-10">
+        <div className="flex items-center justify-between gap-2 app-no-drag">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={toggleInterview}
               className={[
-                'app-no-drag text-[11px] uppercase tracking-wider px-2 py-1 rounded-md border',
+                'pixel-eyebrow px-2.5 py-1 border',
                 interview.isRunning
-                  ? 'bg-accent-600/20 border-accent-600/60 text-accent-300'
-                  : 'border-border-subtle text-text-secondary hover:bg-bg-3',
+                  ? 'border-ink-900 bg-ink-900 text-paper'
+                  : 'border-hairline text-ink-600 hover:text-ink-900',
               ].join(' ')}
             >
-              {interview.isRunning ? '● Interview' : 'Interview'}
+              {interview.isRunning ? '● INTERVIEW' : 'INTERVIEW'}
             </button>
             {interview.isRunning && (
               <button
                 type="button"
                 onClick={() => setBodyMode((b) => (b === 'chat' ? 'transcript' : 'chat'))}
-                className="app-no-drag text-[11px] uppercase tracking-wider px-2 py-1 rounded-md border border-border-subtle text-text-secondary hover:bg-bg-3"
+                className="pixel-eyebrow px-2.5 py-1 border border-hairline text-ink-600 hover:text-ink-900"
               >
-                {bodyMode === 'chat' ? 'Show transcript' : 'Show chat'}
+                {bodyMode === 'chat' ? 'TRANSCRIPT' : 'CHAT'}
               </button>
             )}
             {interview.isRunning && (
               <button
                 type="button"
                 onClick={askInterviewAnswer}
-                className="app-no-drag text-[11px] uppercase tracking-wider px-2 py-1 rounded-md bg-accent-600 text-white hover:bg-accent-700"
+                className="pixel-eyebrow px-2.5 py-1 border border-ink-900 bg-ink-900 text-paper"
               >
-                How do I answer?
+                HOW DO I ANSWER?
               </button>
             )}
           </div>
           <button
             type="button"
             onClick={() => setProReasoning((p) => !p)}
-            title="Toggle Sonnet (deep reasoning) for the next turn"
+            title="Sonnet (deep reasoning) for the next turn"
             className={[
-              'app-no-drag text-base w-7 h-7 rounded-md flex items-center justify-center',
-              proReasoning ? 'text-accent-400 bg-accent-600/20' : 'text-text-tertiary hover:bg-bg-3',
+              'app-no-drag w-7 h-7 rounded-full flex items-center justify-center',
+              proReasoning ? 'text-ink-900 bg-bone' : 'text-ink-400 hover:bg-bone',
             ].join(' ')}
+            style={{ fontSize: 16 }}
           >
             ★
           </button>
         </div>
 
-        {/* Body — chat or transcript */}
-        <div className="z-10 app-no-drag">
+        {/* Body */}
+        <div className="app-no-drag">
           {interview.isRunning && bodyMode === 'transcript' ? (
             <InterviewTranscript state={interview} />
           ) : (
-            <div className="max-h-[360px] overflow-y-auto flex flex-col gap-2 min-w-[320px]">
+            <div className="overflow-y-auto flex flex-col gap-2"
+                 style={{ minWidth: 320, maxHeight: 360 }}>
               {messages.length === 0 && !lastError ? (
                 <SuggestionsHome onPick={(s) => setQuery(s)} />
               ) : (
                 <>
                   {messages.map((m) => <BubbleRow key={m.id} message={m} />)}
                   {lastError && (
-                    <div className="rounded-md bg-red-500/10 border border-red-500/30 text-red-300 text-xs px-2.5 py-2">
+                    <div className="rounded text-red-700 px-2.5 py-2"
+                         style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', fontSize: 12 }}>
                       {lastError}
                     </div>
                   )}
-                  <div ref={messagesEndRef} />
+                  <div ref={endRef} />
                 </>
               )}
             </div>
@@ -340,7 +362,7 @@ export function Pill() {
         </div>
 
         {/* Input row */}
-        <div className="z-10 app-no-drag bg-bg-2/80 rounded-2xl border border-border-subtle px-2.5 py-1.5 flex items-end gap-2">
+        <div className="app-no-drag bg-bone border border-hairline px-2.5 py-1.5 flex items-end gap-2 rounded-2xl">
           {voice.kind === 'recording' ? (
             <MicWaveform level={micLevel} active />
           ) : null}
@@ -350,8 +372,7 @@ export function Pill() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                submit();
+                e.preventDefault(); submit();
               }
               if (e.key === 'Escape') {
                 e.preventDefault();
@@ -363,15 +384,16 @@ export function Pill() {
               (interview.isRunning ? 'Type or use the buttons above…' : 'Ask Keyfloe…')
             }
             rows={1}
-            className="flex-1 bg-transparent text-text-primary text-sm placeholder:text-text-tertiary resize-none outline-none max-h-24 min-h-[24px]"
+            className="flex-1 bg-transparent text-ink-900 placeholder:text-ink-400 resize-none outline-none"
+            style={{ fontSize: 14, maxHeight: 96, minHeight: 24 }}
           />
           {submitting ? (
             <button
               type="button"
               onClick={cancelStream}
-              className="text-text-secondary text-xs px-2 py-1 rounded hover:bg-bg-3"
+              className="pixel-eyebrow px-2 py-1 text-ink-600 hover:text-ink-900"
             >
-              Stop
+              STOP
             </button>
           ) : (
             <button
@@ -379,13 +401,13 @@ export function Pill() {
               onClick={submit}
               disabled={!query.trim()}
               className={[
-                'text-xs px-2.5 py-1 rounded',
+                'pixel-eyebrow px-2.5 py-1 border',
                 query.trim()
-                  ? 'bg-accent-600 text-white hover:bg-accent-700'
-                  : 'bg-bg-3 text-text-tertiary cursor-not-allowed',
+                  ? 'border-ink-900 bg-ink-900 text-paper'
+                  : 'border-hairline text-ink-400 cursor-not-allowed',
               ].join(' ')}
             >
-              Send
+              SEND
             </button>
           )}
         </div>
@@ -403,7 +425,6 @@ const SYSTEM_PROMPT = [
 ].join(' ');
 
 function SuggestionsHome({ onPick }: { onPick: (text: string) => void }) {
-  // Mirror of Pill/SuggestionEngine.swift starter chips.
   const suggestions = [
     'What\'s on my screen?',
     'Summarise this page',
@@ -411,17 +432,16 @@ function SuggestionsHome({ onPick }: { onPick: (text: string) => void }) {
     'What should I do next?',
   ];
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="text-[11px] uppercase tracking-wider text-text-tertiary px-1">
-        Try
-      </div>
+    <div className="flex flex-col gap-1.5 p-1">
+      <EditorialEyebrow text="Try" />
       <div className="flex flex-wrap gap-1.5">
         {suggestions.map((s) => (
           <button
             key={s}
             type="button"
             onClick={() => onPick(s)}
-            className="app-no-drag text-xs px-2.5 py-1.5 rounded-full bg-bg-3 border border-border-subtle text-text-primary hover:bg-bg-4"
+            className="app-no-drag px-2.5 py-1.5 rounded-full bg-bone border border-hairline text-ink-900 hover:bg-paper"
+            style={{ fontSize: 12 }}
           >
             {s}
           </button>

@@ -35,6 +35,10 @@ const api = {
     resize:  (w: number, h: number) =>
                 ipcRenderer.invoke(IPC.pillResize, { width: w, height: h }),
   },
+  notch: {
+    setState: (payload: { state: 'idle' | 'hoverCompact' | 'expandedFull'; width: number; height: number }) =>
+                ipcRenderer.invoke(IPC.notchSetState, payload),
+  },
   capture: {
     screen: () => ipcRenderer.invoke(IPC.captureScreen) as Promise<string | null>,
   },

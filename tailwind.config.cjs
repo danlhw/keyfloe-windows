@@ -3,74 +3,46 @@ module.exports = {
   content: ['./src/renderer/**/*.{html,ts,tsx}'],
   theme: {
     extend: {
+      // Editorial palette — paper + bone + ink. Auto-flips via the CSS
+      // variables in globals.css (--paper / --bone / --ink-*). Exposed
+      // to Tailwind via the var() bridge so utility classes like
+      // bg-paper / text-ink-900 / border-hairline still work.
       colors: {
-        // Mirrored 1:1 from app/Sources/Clicky/DesignSystem.swift
-        // so the Windows surfaces match the Mac dashboard pixel-for-pixel.
-        bg: {
-          base: '#101211',
-          1: '#171918',
-          2: '#202221',
-          3: '#272A29',
-          4: '#2E3130',
+        paper:   'var(--paper)',
+        bone:    'var(--bone)',
+        ink: {
+          900: 'var(--ink-900)',
+          600: 'var(--ink-600)',
+          400: 'var(--ink-400)',
         },
-        border: {
-          subtle: '#373B39',
-          strong: '#444947',
-        },
-        text: {
-          primary: '#ECEEED',
-          secondary: '#ADB5B2',
-          tertiary: '#6B736F',
-        },
-        accent: {
-          50:  '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-          950: '#172554',
-        },
-      },
-      borderRadius: {
-        pill: '22px',
+        hairline: 'var(--hairline)',
+        // Live / OK semantic colors (StatusChip dots).
+        live:    '#20c55c',
+        // Kept for the accent/cursor highlight in Clicky overlay only.
+        cursor:  '#60a5fa',
       },
       fontFamily: {
-        sans: [
-          '"Segoe UI Variable"',
-          '"Segoe UI"',
-          '-apple-system',
-          'BlinkMacSystemFont',
-          'system-ui',
-          'sans-serif',
-        ],
-        mono: ['"Cascadia Code"', '"Cascadia Mono"', 'Consolas', 'monospace'],
+        sans:   ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI Variable"',
+                 '"Segoe UI"', 'system-ui', 'sans-serif'],
+        serif:  ['Fraunces', 'Georgia', 'serif'],
+        pixel:  ['DepartureMono', 'ui-monospace', '"Cascadia Mono"',
+                 'Consolas', 'monospace'],
       },
-      backdropBlur: {
-        pill: '32px',
+      fontSize: {
+        // Display ramp from OneClickStyle.Display
+        'display-xl': ['64px', { lineHeight: '1.04', letterSpacing: '-0.01em' }],
+        'display-lg': ['44px', { lineHeight: '1.05', letterSpacing: '-0.01em' }],
+        'display-md': ['36px', { lineHeight: '1.08', letterSpacing: '-0.005em' }],
+        'display-sm': ['26px', { lineHeight: '1.12' }],
+        'eyebrow':    ['10.5px', { letterSpacing: '0.16em', lineHeight: '1' }],
       },
-      animation: {
-        'pulse-mic': 'pulse-mic 1.4s ease-in-out infinite',
-        'typing-dot': 'typing-dot 1.2s ease-in-out infinite',
-        'reveal': 'reveal 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+      borderRadius: {
+        pill: '999px',
+        card: '12px',
       },
-      keyframes: {
-        'pulse-mic': {
-          '0%, 100%': { transform: 'scaleY(0.3)' },
-          '50%':       { transform: 'scaleY(1)' },
-        },
-        'typing-dot': {
-          '0%, 80%, 100%': { opacity: '0.2', transform: 'scale(0.8)' },
-          '40%':            { opacity: '1',   transform: 'scale(1.0)' },
-        },
-        'reveal': {
-          '0%':   { opacity: '0', transform: 'translateY(6px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
-        },
+      letterSpacing: {
+        eyebrow: '0.16em',
+        widest2: '0.22em',
       },
     },
   },

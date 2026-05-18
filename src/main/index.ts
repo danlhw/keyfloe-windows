@@ -60,7 +60,6 @@ class Keyfloe {
     });
 
     this.windows.build();
-    this.windows.openDashboard();
     installTray();
     this.registerIpc();
 
@@ -84,9 +83,8 @@ class Keyfloe {
       this.interview.stop().catch(() => undefined);
     });
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        this.windows.openDashboard();
-      }
+      // Dock icon clicked (macOS dev) or no notch window left.
+      this.windows.focusDashboard();
     });
   }
 
