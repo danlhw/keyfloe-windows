@@ -52,11 +52,18 @@
   }
 }
 
+/* ─── Window-body backgrounds ───────────────────────────────────
+   Every Electron BrowserWindow we create is `transparent: true`, so
+   the body MUST be transparent by default — otherwise a paper-colored
+   body on a fullscreen overlay window becomes a paper-colored sheet
+   covering the whole screen ("white screen of death"). The Dashboard
+   component sets its own bg-paper on its root since it has chrome
+   (sidebar + paper canvas) and shouldn't bleed-through. */
 html, body, #root {
   margin: 0;
   padding: 0;
   height: 100vh;
-  background: var(--paper);
+  background: transparent;
   color: var(--ink-900);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable',
                'Segoe UI', system-ui, sans-serif;
@@ -65,10 +72,11 @@ html, body, #root {
   user-select: none;
 }
 
-/* The notch shell + overlay windows want a transparent body. They
-   override .bg-transparent on <body>; the dashboard does NOT. */
-body.transparent {
-  background: transparent;
+/* Opt-in helper for any future window that wants the warm paper
+   surface (e.g. an onboarding flow). The dashboard root uses Tailwind's
+   bg-paper directly instead of this class. */
+body.paper {
+  background: var(--paper);
 }
 
 /* ─── Editorial type helpers ─────────────────────────────────── */

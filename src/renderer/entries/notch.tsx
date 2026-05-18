@@ -1,6 +1,11 @@
 import { createRoot } from 'react-dom/client';
 import '../styles/globals.css';
 import { Notch } from '../views/Notch';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 const root = createRoot(document.getElementById('root')!);
-root.render(<Notch />);
+root.render(
+  <ErrorBoundary surface="notch">
+    <Notch />
+  </ErrorBoundary>,
+);

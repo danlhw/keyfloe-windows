@@ -34,10 +34,6 @@ export class ClickyPointer {
       question: string;
       screen: { width: number; height: number };
     }) => {
-      // Two parallel paths:
-      //   (a) ask Claude for an inline pointer-tag answer
-      //   (b) ask the Computer Use beta for grounded coords
-      // Whoever returns first usable coords wins; the other is ignored.
       const inline = this.askInline(payload);
       const grounded = this.askGrounded(payload);
       const result = await Promise.any([inline, grounded]).catch((e) => {
@@ -49,6 +45,8 @@ export class ClickyPointer {
 
     ipcMain.handle(IPC.pointerClear, async () => {
       this.state = { mode: 'hidden', target: null, cursor: this.state.cursor };
+      // Tear the overlays down so they can't keep painting / capturing input.
+      WindowManager.shared.hideOverlays();
       this.broadcast();
     });
   }
@@ -117,9 +115,12 @@ export class ClickyPointer {
       target,
       cursor: screen.getCursorScreenPoint(),
     };
-    this.broadcast();
-    // Don't auto-clear — the renderer holds the bubble until the user
-    // moves their mouse significantly or asks another turn.
+    // Lazy-create the overlay windows now (one per display) before
+    // broadcasting state — otherwise the broadcast would land on no
+    // listeners and the bubble would never paint.
+    WindowManager.shared.showOverlays();
+    // Tiny delay so the renderer is wired up before we send state.
+    setTimeout(() => this.broadcast(), 40);
     logger.info('pointer.show', target);
   }
 

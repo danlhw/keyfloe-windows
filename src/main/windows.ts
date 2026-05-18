@@ -8,11 +8,14 @@ import { IPC } from '../shared/ipc';
 //   notch    — pinned top-center, frameless transparent, always on top.
 //              Hosts the notch shell (idle / hoverCompact / expandedFull).
 //   pill     — frameless transparent, anchored to the cursor on tap.
-//   overlay  — one per display, transparent click-through, hosts the
-//              Clicky blue cursor + speech bubble.
-//
-// Renderer entry points are separate HTML files emitted by Vite under
-// dist/renderer/.
+//   overlay  — one per display, transparent click-through, lazily created
+//              ONLY when the Clicky pointer needs to land somewhere.
+//              They used to be permanent fullscreen always-on-top windows;
+//              on macOS that combination + setIgnoreMouseEvents(true,
+//              {forward:true}) wedged input and rendered the screen blank
+//              while we figured out body-background bugs. Lazy + small
+//              when hidden is the safe default — see windows.showOverlays /
+//              hideOverlays.
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 
@@ -21,9 +24,8 @@ function rendererUrl(page: 'notch' | 'dashboard' | 'pill' | 'overlay'): string {
   return `file://${path.join(__dirname, '..', 'renderer', `${page}.html`)}`;
 }
 
-// Notch geometry mirrored from NotchGeometry.swift. Lip dimensions and
-// the three state-size profiles need to stay in lockstep with the
-// renderer (see src/renderer/views/Notch.tsx).
+// Notch geometry mirrored from NotchGeometry.swift. Keep these in lockstep
+// with src/renderer/views/Notch.tsx.
 const NOTCH_WIDTH  = 200;
 const NOTCH_HEIGHT = 32;
 type NotchState = 'idle' | 'hoverCompact' | 'expandedFull';
@@ -41,18 +43,15 @@ export class WindowManager {
   private overlays: BrowserWindow[] = [];
 
   build() {
-    // The notch is the primary surface — it owns the dashboard. The pill
-    // is created lazily on first hotkey press. Overlays are one per
-    // display, always painted but transparent + click-through.
+    // Notch is the primary surface. Pill is lazy on first hotkey press.
+    // Overlays are lazy on first pointer target.
     this.createNotch();
     this.pill = this.createPill();
-    this.createOverlaysForAllDisplays();
 
-    // Reposition the notch and rebuild overlays when the display
-    // topology changes (lid open/close, monitor plug, resolution flip).
-    screen.on('display-added',           () => { this.repositionNotch(); this.createOverlaysForAllDisplays(); });
-    screen.on('display-removed',         () => { this.repositionNotch(); this.createOverlaysForAllDisplays(); });
-    screen.on('display-metrics-changed', () => { this.repositionNotch(); this.createOverlaysForAllDisplays(); });
+    // Reposition the notch when the display topology changes.
+    screen.on('display-added',           () => this.repositionNotch());
+    screen.on('display-removed',         () => this.repositionNotch());
+    screen.on('display-metrics-changed', () => this.repositionNotch());
 
     ipcMain.handle(IPC.notchSetState, (_e, payload: { state: NotchState; width: number; height: number }) => {
       this.resizeNotch(payload.width, payload.height);
@@ -86,7 +85,10 @@ export class WindowManager {
         sandbox: false,
       },
     });
-    win.setAlwaysOnTop(true, 'screen-saver');
+    // Use 'floating' rather than 'screen-saver' so we sit above normal
+    // app windows but BELOW the macOS menu bar / screen-saver — that
+    // way a misbehaving notch can't lock the user out of the menu bar.
+    win.setAlwaysOnTop(true, 'floating');
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     win.loadURL(rendererUrl('notch'));
     win.on('closed', () => { this.notch = null; });
@@ -94,12 +96,16 @@ export class WindowManager {
   }
 
   private notchOrigin(display: Display, size: { width: number; height: number }) {
-    // Centered along the top edge of the primary display's *bounds*
-    // (not work area) so it visually replaces the menu-bar/title-area
-    // strip the way the Mac notch does.
+    // Center horizontally on the display. Vertically:
+    //   • Windows: bounds.y (top of the physical display) — there's no
+    //     menu bar to collide with.
+    //   • macOS:   workArea.y so the notch sits just below the menu bar
+    //     during the dev loop. Otherwise a transparent always-on-top
+    //     window pinned at bounds.y fights for space with the menu bar
+    //     and renders unpredictably.
     const x = Math.round(display.bounds.x + (display.bounds.width - size.width) / 2);
-    const y = display.bounds.y;
-    return { x, y };
+    const yBase = process.platform === 'darwin' ? display.workArea.y : display.bounds.y;
+    return { x, y: yBase };
   }
 
   private repositionNotch() {
@@ -120,16 +126,9 @@ export class WindowManager {
   }
 
   focusDashboard() {
-    // "Open the dashboard" from the tray = grow the notch to expandedFull.
-    // We just bring the notch window forward and ping the renderer; the
-    // renderer flips its internal state machine.
-    if (!this.notch || this.notch.isDestroyed()) {
-      this.createNotch();
-    }
+    if (!this.notch || this.notch.isDestroyed()) this.createNotch();
     this.notch?.show();
     this.notch?.focus();
-    // The renderer subscribes to this so the user gets the dashboard
-    // open immediately, even though they didn't hover.
     this.notch?.webContents.send('notch:request-expand');
   }
 
@@ -157,35 +156,36 @@ export class WindowManager {
         sandbox: false,
       },
     });
-    win.setAlwaysOnTop(true, 'screen-saver');
+    // 'floating' here too — same reason as the notch. Without it,
+    // 'screen-saver' on macOS can wedge focus when the pill loses key.
+    win.setAlwaysOnTop(true, 'floating');
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     win.loadURL(rendererUrl('pill'));
     return win;
   }
 
   showPill() {
-    if (!this.pill || this.pill.isDestroyed()) {
-      this.pill = this.createPill();
-    }
+    if (!this.pill || this.pill.isDestroyed()) this.pill = this.createPill();
     this.anchorPillToCursor();
     this.pill.showInactive();
     this.pill.focus();
   }
-
   hidePill() {
     if (this.pill && !this.pill.isDestroyed()) this.pill.hide();
   }
-
   togglePill() {
     if (!this.pill) { this.showPill(); return; }
     if (this.pill.isVisible()) this.hidePill();
     else this.showPill();
   }
-
   resizePill(width: number, height: number) {
     if (!this.pill || this.pill.isDestroyed()) return;
     const [w, h] = this.pill.getSize();
-    if (Math.abs(w - width) < 2 && Math.abs(h - height) < 2) return;
+    // Only meaningful (>4px) changes propagate. Without this guard the
+    // renderer's ResizeObserver could ping-pong with the OS layout
+    // engine — each round trip shaving sub-pixel float values would
+    // re-fire the observer.
+    if (Math.abs(w - width) < 4 && Math.abs(h - height) < 4) return;
     this.pill.setSize(Math.round(width), Math.round(height));
   }
 
@@ -205,12 +205,22 @@ export class WindowManager {
     this.pill.setPosition(x, y);
   }
 
-  // ─── Overlays (Clicky cursor + speech bubble) ───────────────────
+  // ─── Overlays (Clicky cursor + speech bubble) — LAZY ────────────
 
-  private createOverlaysForAllDisplays() {
+  /// Create one transparent click-through window per display, ONLY when
+  /// the Clicky pointer has a target to render. Called from
+  /// ClickyPointer.showTarget(). When the target is cleared,
+  /// hideOverlays() destroys them — eliminates the "fullscreen
+  /// always-on-top window swallowing input" failure mode.
+  showOverlays(): BrowserWindow[] {
+    if (this.overlays.length > 0) return this.overlays;
+    screen.getAllDisplays().forEach((d) => this.overlays.push(this.createOverlay(d)));
+    return this.overlays;
+  }
+
+  hideOverlays() {
     this.overlays.forEach((w) => { if (!w.isDestroyed()) w.destroy(); });
     this.overlays = [];
-    screen.getAllDisplays().forEach((d) => this.overlays.push(this.createOverlay(d)));
   }
 
   private createOverlay(display: Display): BrowserWindow {
@@ -236,8 +246,12 @@ export class WindowManager {
         sandbox: false,
       },
     });
-    win.setIgnoreMouseEvents(true, { forward: true });
-    win.setAlwaysOnTop(true, 'screen-saver');
+    // forward:false because forward:true on macOS leaks clicks under
+    // some conditions and we don't need cursor-position forwarding for
+    // the overlay use-case (we drive it from screen.getCursorScreenPoint
+    // in main).
+    win.setIgnoreMouseEvents(true);
+    win.setAlwaysOnTop(true, 'floating');
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     win.loadURL(rendererUrl('overlay'));
     return win;
@@ -245,7 +259,7 @@ export class WindowManager {
 
   overlayWindows() { return this.overlays.filter((w) => !w.isDestroyed()); }
 
-  // ─── Screen capture (per-display, sent into Claude as the per-turn image) ─
+  // ─── Screen capture ─────────────────────────────────────────────
 
   async captureScreen(display: Display): Promise<string | null> {
     const { desktopCapturer } = await import('electron');

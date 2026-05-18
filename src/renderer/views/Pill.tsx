@@ -174,21 +174,35 @@ export function Pill() {
     }, 250);
   }, [voice]);
 
-  // Auto-resize the pill window to fit the rendered content.
+  // Auto-resize the pill window to fit the rendered content. Two guards
+  // to avoid the ResizeObserver feedback loop that froze the app on
+  // first launch:
+  //   1. Track lastSentRef so we only IPC when the size has visibly
+  //      moved (≥4px in either dimension).
+  //   2. requestAnimationFrame coalesces multiple observer fires inside
+  //      a single layout pass into one resize call. Without this,
+  //      Chromium throws "ResizeObserver loop completed with undelivered
+  //      notifications" warnings on every keystroke.
   useEffect(() => {
     const el = document.getElementById('pill-root');
     if (!el) return;
+    let rafId = 0;
+    let lastSentW = 0, lastSentH = 0;
     const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const cr = entry.contentRect;
-        window.keyfloe.pill.resize(
-          Math.ceil(cr.width + 24),
-          Math.ceil(cr.height + 24),
-        );
-      }
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        const cr = entries[entries.length - 1]?.contentRect;
+        if (!cr) return;
+        const w = Math.ceil(cr.width + 24);
+        const h = Math.ceil(cr.height + 24);
+        if (Math.abs(w - lastSentW) < 4 && Math.abs(h - lastSentH) < 4) return;
+        lastSentW = w; lastSentH = h;
+        window.keyfloe.pill.resize(w, h);
+      });
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => { ro.disconnect(); if (rafId) cancelAnimationFrame(rafId); };
   }, []);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
