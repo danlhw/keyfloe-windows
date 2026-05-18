@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  font-family: 'Segoe UI Variable', 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  color: #ECEEED;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+body {
+  background: transparent;
+}
+
+/* Faux NSVisualEffectView. Windows has no system-wide vibrancy
+   material, so we approximate with a heavy backdrop blur + low-opacity
+   fill. Same recipe as the Mac PillBackground when running on
+   macOS 14/15 fallback. */
+.pill-glass {
+  background: rgba(23, 25, 24, 0.78);
+  backdrop-filter: blur(32px) saturate(140%);
+  -webkit-backdrop-filter: blur(32px) saturate(140%);
+  border: 0.5px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 18px 60px rgba(0, 0, 0, 0.50),
+    0 4px 14px rgba(0, 0, 0, 0.30);
+}
+
+.pill-glass-clear {
+  background: rgba(23, 25, 24, 0.34);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  border: 0.5px solid rgba(255, 255, 255, 0.18);
+}
+
+/* The drag handle: AppKit's NSWindow.movableByWindowBackground equivalent
+   for Electron is the -webkit-app-region: drag CSS property. Apply to the
+   pill background; opt children that need to be clickable out with
+   no-drag. */
+.app-drag    { -webkit-app-region: drag; }
+.app-no-drag { -webkit-app-region: no-drag; }
+
+/* Dot-grid overlay shared by pill + dashboard hero. 18 px grid, 0.9 px
+   dots, 16% ink, soft radial mask fade. Same recipe as Hero.tsx in the
+   marketing site. */
+.dot-grid {
+  background-image: radial-gradient(rgba(255,255,255,0.16) 0.9px, transparent 0.9px);
+  background-size: 18px 18px;
+  mask-image: radial-gradient(circle at 50% 30%, black 30%, transparent 80%);
+  -webkit-mask-image: radial-gradient(circle at 50% 30%, black 30%, transparent 80%);
+}
+
+/* Tiny scrollbars. Default Windows scrollbars are loud against the
+   dark pill body. */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.20); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Push-to-talk waveform bars. Animated via Tailwind keyframes
+   (animate-pulse-mic), staggered per bar via inline animation-delay. */
+.mic-bar {
+  width: 3px;
+  border-radius: 2px;
+  background: #60a5fa;
+  transform-origin: center;
+}
+
+/* Streaming "typing" dots — same look as iMessage. */
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.55);
+  display: inline-block;
+}
