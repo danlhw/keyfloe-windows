@@ -26,8 +26,11 @@ type State = 'idle' | 'hoverCompact' | 'expandedFull';
 
 const SIZES = {
   idle:         { width: NOTCH_WIDTH, height: NOTCH_HEIGHT },
-  hoverCompact: { width: 460,         height: 96 },
-  expandedFull: { width: 1040,        height: 720 },
+  // Mac NotchGeometry uses 110pt hoverCompact tall — bumping ours to
+  // match so text doesn't get vertically cut off ("letters cut off
+  // by the edges" user report).
+  hoverCompact: { width: 520,         height: 112 },
+  expandedFull: { width: 1080,        height: 720 },
 };
 
 export function Notch() {
@@ -74,12 +77,20 @@ export function Notch() {
       leaveTimerRef.current = null;
     }
     if (state === 'idle') setState('hoverCompact');
+    // Force window focus on entry. Frameless transparent always-on-top
+    // windows on Windows often need an explicit focus poke before they
+    // accept clicks — that was the "have to press twice" report. With
+    // focus pre-acquired, the very first click on a quick-action button
+    // fires its onClick instead of being eaten as a focus-grab gesture.
+    window.focus();
   }
   function onMouseLeave() {
     if (state === 'idle') return;
-    // Generous grace in expanded so brushing a scrollbar doesn't dismiss
-    // the dashboard. Tighter in compact so it feels snappy.
-    const grace = state === 'expandedFull' ? 800 : 320;
+    // Snappy close — user said the previous 320ms compact / 800ms
+    // expanded grace made them have to move "so much further away".
+    // Tighter: 120ms compact (fast collapse if they truly left),
+    // 350ms expanded (still forgiving for scrollbar brush).
+    const grace = state === 'expandedFull' ? 350 : 120;
     leaveTimerRef.current = setTimeout(() => {
       setState('idle');
       leaveTimerRef.current = null;

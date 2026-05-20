@@ -171,13 +171,15 @@ export class InterviewService {
         ? '(No live transcript yet — read the interviewer\'s question from the attached screenshot.)'
         : `Live transcript (most recent at the bottom):\n${transcript}`;
 
+      // Drop the `feature: 'interview'` Worker entitlement gate for v0.1.x —
+      // it was returning 402 for non-Pro users, making the button look
+      // broken. Re-add when we have a real billing/entitlement flow.
       const text = await chatOnce({
         system,
         history: [],
         userText,
         model: 'claude-sonnet-4-6',
         maxTokens: 800,
-        feature: 'interview',
       });
       return { ok: true, text: text.trim() };
     } catch (err) {

@@ -20,12 +20,11 @@ import {
 } from '../components/editorial';
 
 type Tab =
-  | 'home' | 'tasks' | 'profile' | 'dictations'
+  | 'home' | 'profile' | 'dictations'
   | 'conversations' | 'billing' | 'settings';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'home',          label: 'Home' },
-  { id: 'tasks',         label: 'Tasks' },
   { id: 'profile',       label: 'Profile' },
   { id: 'dictations',    label: 'Dictations' },
   { id: 'conversations', label: 'Conversations' },
@@ -37,11 +36,17 @@ export function Dashboard() {
   const [tab, setTab] = useState<Tab>('home');
 
   return (
-    <div className="flex w-full h-full min-h-0 bg-paper">
+    <div
+      className="flex w-full h-full min-h-0 bg-paper"
+      // GPU layer for smoother scrolling on dashboards with many cards.
+      style={{ transform: 'translateZ(0)', willChange: 'transform' }}
+    >
       <Sidebar tab={tab} setTab={setTab} />
-      <main className="flex-1 min-w-0 overflow-y-auto">
+      <main
+        className="flex-1 min-w-0 overflow-y-auto"
+        style={{ contain: 'paint', willChange: 'scroll-position' }}
+      >
         {tab === 'home'          && <HomeTab />}
-        {tab === 'tasks'         && <TasksTab />}
         {tab === 'profile'       && <ProfileTab />}
         {tab === 'dictations'    && <DictationsTab />}
         {tab === 'conversations' && <ConversationsTab />}
@@ -118,41 +123,9 @@ function HomeTab() {
       <EditorialDivider className="mb-8" />
 
       <div className="flex flex-col gap-6">
-        <ActiveTasksCard />
-        <MemoryPeekCard />
         <DictationStatsCard />
       </div>
     </div>
-  );
-}
-
-function ActiveTasksCard() {
-  return (
-    <EditorialCard>
-      <div className="flex items-center justify-between pb-1">
-        <StatusChip text="Floe Agent" trailing="idle" variant="ghost" />
-      </div>
-      <p className="text-ink-600 leading-relaxed" style={{ fontSize: 13.5 }}>
-        No tasks yet. Hold Right-Ctrl and tell the agent what to do —
-        it runs in the background and lands a notification when it's done.
-      </p>
-    </EditorialCard>
-  );
-}
-
-function MemoryPeekCard() {
-  return (
-    <EditorialCard>
-      <div className="flex items-center justify-between pb-1">
-        <StatusChip text="Memory" trailing="empty" variant="ghost" />
-        <EditorialButton label="Edit" onClick={() => undefined} />
-      </div>
-      <p className="text-ink-600 leading-relaxed" style={{ fontSize: 13.5 }}>
-        Nothing memorised yet. Tell the agent something durable —
-        "I'm Daniel, my team is Onefloe" — and it'll save it here so
-        the next conversation already knows.
-      </p>
-    </EditorialCard>
   );
 }
 
@@ -182,31 +155,6 @@ function DictationStatsCard() {
   );
 }
 
-// ─── TASKS ─────────────────────────────────────────────────────────
-
-function TasksTab() {
-  return (
-    <div className="px-10 py-9" style={{ maxWidth: 1100 }}>
-      <TabHeader
-        eyebrow="Tasks"
-        title="Floe Agent, "
-        italic="working."
-      />
-      <EditorialCard>
-        <p className="text-ink-600 leading-relaxed" style={{ fontSize: 14 }}>
-          Background agent tasks aren't enabled in the Windows build yet.
-          The Mac app uses AppleScript + Calendar + Mail + Messages to
-          run multi-step automations; the Windows equivalent (Outlook
-          COM + UI Automation) is in the roadmap — see <code>docs/PORT-NOTES.md</code>.
-        </p>
-        <p className="text-ink-600 pt-2" style={{ fontSize: 13 }}>
-          For now, the pill chat + dictation + interview + Clicky
-          pointer modes all work.
-        </p>
-      </EditorialCard>
-    </div>
-  );
-}
 
 // ─── PROFILE ───────────────────────────────────────────────────────
 

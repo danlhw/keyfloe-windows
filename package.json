@@ -1,7 +1,7 @@
 {
   "name": "keyfloe-windows",
   "productName": "Keyfloe",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Keyfloe for Windows — native AI companion. Voice in, text out. Right-Ctrl opens a chat pill anchored to the cursor; hold Right-Ctrl to dictate; Interview mode for live call transcription + answer suggestions; Clicky cursor pointer mode for screen-grounded help.",
   "author": "Onefloe",
   "license": "UNLICENSED",
@@ -21,7 +21,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.40.0",
+    "@types/marked": "^5.0.2",
     "electron-store": "^8.2.0",
+    "marked": "^18.0.4",
     "node-fetch": "^3.3.2",
     "uiohook-napi": "^1.5.4",
     "uuid": "^11.0.3",

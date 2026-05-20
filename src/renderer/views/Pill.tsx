@@ -201,6 +201,9 @@ export function Pill() {
   }, [messages]);
 
   // ─── Actions ────────────────────────────────────────────────────
+  const lastScreenshotRef = useRef<string | null>(null);
+  const lastQuestionRef   = useRef<string>('');
+
   const submit = useCallback(async () => {
     const trimmed = query.trim();
     if (!trimmed || submitting) return;
@@ -216,6 +219,10 @@ export function Pill() {
     const priorHistory = messages.map((m) => ({ role: m.role, content: m.text }));
     setMessages((prev) => [...prev, userMsg, assistant]);
     const shot = await window.keyfloe.capture.screen().catch(() => null);
+    // Stash for Clicky auto-trigger if Claude emits a [POINT]/[CLICK]
+    // tag in the response.
+    lastScreenshotRef.current = shot;
+    lastQuestionRef.current = trimmed;
     const streamId = await window.keyfloe.chat.stream({
       system: SYSTEM_PROMPT,
       history: priorHistory,
@@ -227,6 +234,30 @@ export function Pill() {
     });
     streamIdRef.current = streamId;
   }, [query, submitting, messages, proReasoning]);
+
+  // Clicky cursor auto-trigger: scan each completed assistant message for
+  // a [POINT: x,y "label"] or [CLICK: x,y] tag. When found, ask the main
+  // pointer service to show the overlay. Mirrors Mac PillView's
+  // post-stream tag parsing.
+  const POINT_RE = /\[POINT[:\s]+(\d+)[,\s]+(\d+)(?:\s+"([^"]*)")?\]/i;
+  const CLICK_RE = /\[CLICK[:\s]+(\d+)[,\s]+(\d+)(?:\s+"([^"]*)")?\]/i;
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'assistant' || last.isStreaming) return;
+    const text = last.text;
+    const m = text.match(CLICK_RE) || text.match(POINT_RE);
+    if (!m) return;
+    const screenshot = lastScreenshotRef.current;
+    const question = lastQuestionRef.current;
+    if (!screenshot || !question) return;
+    // Reset refs so we don't re-fire on the same message.
+    lastScreenshotRef.current = null;
+    window.keyfloe.pointer.request({
+      screenshotDataUrl: screenshot,
+      question,
+      screen: { width: window.screen.width, height: window.screen.height },
+    }).catch((err) => console.warn('pointer.request failed', err));
+  }, [messages]);
 
   const cancelStream = useCallback(() => {
     if (streamIdRef.current) {

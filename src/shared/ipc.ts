@@ -21,6 +21,7 @@ export const IPC = {
   dictationPaste:    'dictation:paste',
   captureScreen:     'capture:screen',
   permissionsCheck:  'permissions:check',
+  platformInfo:      'platform:info',       // returns { platform, isWin11, hasAcrylic }
 
   // Main → Renderer (broadcast)
   chatDelta:         'chat:delta',         // { streamId, delta }

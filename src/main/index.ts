@@ -144,6 +144,22 @@ class Keyfloe {
       // back if it was denied.
       platform: process.platform,
     }));
+
+    ipcMain.handle(IPC.platformInfo, () => {
+      // Win11 detection: os.release() returns "10.0.22000" or higher for
+      // Win11. Acrylic was already added in Win10 1809+ but is more
+      // reliable on Win11. We expose acrylic = true on win32 and let
+      // the renderer fall back if it didn't visually take.
+      const release = require('node:os').release() as string;
+      const major = parseInt(release.split('.')[0] || '0', 10);
+      const build = parseInt(release.split('.')[2] || '0', 10);
+      const isWin11 = process.platform === 'win32' && major >= 10 && build >= 22000;
+      return {
+        platform: process.platform,
+        isWin11,
+        hasAcrylic: process.platform === 'win32',
+      };
+    });
   }
 }
 

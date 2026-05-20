@@ -125,13 +125,35 @@ export class WindowManager {
     this.notch.setPosition(x, y);
   }
 
+  // Animated notch resize. The naïve `setBounds(target)` call snapped
+  // the window in one frame, causing the black flicker the user saw
+  // ("black white black white before opening"). Interpolating over
+  // ~10 frames at ~16ms each = 160ms gives a smooth retract /expand
+  // and lets the compositor blend the transition cleanly.
+  private notchAnimationToken = 0;
   private resizeNotch(width: number, height: number) {
     if (!this.notch || this.notch.isDestroyed()) return;
-    const [w, h] = this.notch.getSize();
-    if (Math.abs(w - width) < 2 && Math.abs(h - height) < 2) return;
+    const [w0, h0] = this.notch.getSize();
+    if (Math.abs(w0 - width) < 2 && Math.abs(h0 - height) < 2) return;
+    const token = ++this.notchAnimationToken;
     const primary = screen.getPrimaryDisplay();
-    const { x, y } = this.notchOrigin(primary, { width, height });
-    this.notch.setBounds({ x, y, width: Math.round(width), height: Math.round(height) });
+    const targetW = Math.round(width);
+    const targetH = Math.round(height);
+    const steps = 10;
+    const stepMs = 16;
+    const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    const animate = (i: number) => {
+      if (token !== this.notchAnimationToken) return;
+      if (!this.notch || this.notch.isDestroyed()) return;
+      const t = easeOut(i / steps);
+      const cw = Math.round(w0 + (targetW - w0) * t);
+      const ch = Math.round(h0 + (targetH - h0) * t);
+      const origin = this.notchOrigin(primary, { width: cw, height: ch });
+      this.notch.setBounds({ x: origin.x, y: origin.y, width: cw, height: ch });
+      if (i < steps) setTimeout(() => animate(i + 1), stepMs);
+    };
+    animate(1);
   }
 
   focusDashboard() {

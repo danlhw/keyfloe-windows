@@ -17,6 +17,11 @@ function applyTheme(appearance: Appearance) {
   document.documentElement.setAttribute('data-theme', appearance);
 }
 
+function applyAcrylic(hasAcrylic: boolean) {
+  if (typeof document === 'undefined') return;
+  document.documentElement.setAttribute('data-acrylic', hasAcrylic ? 'true' : 'false');
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Apply once from current settings — main process already loaded
@@ -25,6 +30,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // Subscribe — any window changing Appearance broadcasts via
     // settingsChanged and every other open window re-applies the theme.
     const off = window.keyfloe.settings.onChange((s) => applyTheme(s.appearance));
+    // Platform info — set data-acrylic on the document root so
+    // .pill-glass and .notch-shell pick the right rendering path
+    // (let OS acrylic show vs. paint our own CSS backdrop-filter).
+    window.keyfloe.platform.info().then((p) => applyAcrylic(p.hasAcrylic));
     return () => { off(); };
   }, []);
   return <>{children}</>;

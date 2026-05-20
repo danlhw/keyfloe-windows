@@ -42,6 +42,13 @@ const api = {
   capture: {
     screen: () => ipcRenderer.invoke(IPC.captureScreen) as Promise<string | null>,
   },
+  platform: {
+    info: () => ipcRenderer.invoke(IPC.platformInfo) as Promise<{
+      platform: NodeJS.Platform;
+      isWin11: boolean;
+      hasAcrylic: boolean;
+    }>,
+  },
   hotkey: {
     onTap:       (cb: () => void) => subscribe(IPC.hotkeyTap, cb),
     onHoldStart: (cb: () => void) => subscribe(IPC.hotkeyHoldStart, cb),
