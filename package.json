@@ -86,16 +86,6 @@
         "publisherName": "Onefloe"
       }
     },
-    "electronFuses": {
-      "runAsNode": false,
-      "enableCookieEncryption": true,
-      "enableNodeOptionsEnvironmentVariable": false,
-      "enableNodeCliInspectArguments": false,
-      "enableEmbeddedAsarIntegrityValidation": false,
-      "onlyLoadAppFromAsar": true,
-      "loadBrowserProcessSpecificV8Snapshot": false,
-      "grantFileProtocolExtraPrivileges": false
-    },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
