@@ -11,14 +11,15 @@ import { installTray } from './tray';
 import { IPC } from '../shared/ipc';
 import { logger } from './log';
 
-// Hardware acceleration: disable by default on Windows. The transparent
-// pill window flickers on integrated Intel UHD, and worse, virtualized
-// GPUs (Parallels, VMware, VirtualBox) report HW accel as available but
-// fail to composite transparent always-on-top windows reliably — that's
-// the "window cut off in half / nothing rendering" symptom in a VM. On
-// real Windows laptops the perf hit from disabling HW accel is small;
-// users who want to re-enable can pass `--hw-accel`.
-if (process.platform === 'win32' && !process.argv.includes('--hw-accel')) {
+// Hardware acceleration: ON by default. v0.1.2 turned this off as a
+// "VM safety" workaround that turned out to be the wrong call —
+// disabling HW accel kills backdrop-filter (so no glass effect),
+// makes input latency ~10x worse (notch felt unresponsive, clicks
+// needed multiple presses), and makes scrolling stutter for seconds.
+// Parallels' virtualized GPU handles transparent compositing fine.
+// Only flag-disable if the user explicitly asks via `--no-hw-accel`
+// (e.g. ancient Intel UHD with flicker bugs).
+if (process.argv.includes('--no-hw-accel')) {
   app.disableHardwareAcceleration();
 }
 

@@ -94,6 +94,11 @@ export class WindowManager {
     // way a misbehaving notch can't lock the user out of the menu bar.
     win.setAlwaysOnTop(true, 'floating');
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    // Win11 native acrylic on the notch too — looks like the macOS
+    // notch material, not a flat black rectangle.
+    if (process.platform === 'win32') {
+      try { (win as any).setBackgroundMaterial?.('acrylic'); } catch { /* Win10 fine */ }
+    }
     win.loadURL(rendererUrl('notch'));
     win.on('closed', () => { this.notch = null; });
     this.notch = win;
@@ -171,6 +176,14 @@ export class WindowManager {
     // 'screen-saver' on macOS can wedge focus when the pill loses key.
     win.setAlwaysOnTop(true, 'floating');
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    // Windows 11 native acrylic — real OS-level material like macOS's
+    // NSVisualEffectView. Renders a blurred, frosted surface behind the
+    // window content for free, no CSS backdrop-filter hack needed.
+    // Available on Win11+ only; Win10 falls back to our CSS glass class
+    // (which now works because HW accel is back on).
+    if (process.platform === 'win32') {
+      try { (win as any).setBackgroundMaterial?.('acrylic'); } catch { /* Win10 throws, fine */ }
+    }
     win.loadURL(rendererUrl('pill'));
     return win;
   }
