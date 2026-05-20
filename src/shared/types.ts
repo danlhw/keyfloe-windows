@@ -59,6 +59,7 @@ export interface AppSettings {
   anthropicApiKey: string | null;
   deepseekApiKey: string | null;
   openaiApiKey: string | null;
+  interviewResume: string | null;
 }
 
 // Clicky pointer state — drives the transparent overlay window.

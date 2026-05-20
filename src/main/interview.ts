@@ -158,7 +158,7 @@ export class InterviewService {
         .map((t) => `${t.role}: ${t.text}`)
         .join('\n\n');
 
-      const resume = ''; // TODO: wire up renderer's InterviewProfileStore.
+      const resume = (settings.interviewResume ?? '').trim();
       const system = [
         'You are the user\'s interview coach. The user is in a live interview.',
         'Write the verbatim answer they should say next, in first person.',
@@ -220,6 +220,3 @@ function isHallucination(text: string): boolean {
   return exact.has(lowered);
 }
 
-// Keep settings import alive — the askAnswer flow will be extended to
-// read InterviewProfileStore from electron-store here.
-void settings;

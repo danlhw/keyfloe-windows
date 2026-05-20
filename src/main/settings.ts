@@ -15,6 +15,7 @@ const defaults: AppSettings = {
   anthropicApiKey: null,
   deepseekApiKey: null,
   openaiApiKey: null,
+  interviewResume: null,
 };
 
 const store = new Store<AppSettings>({

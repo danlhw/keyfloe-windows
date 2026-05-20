@@ -212,16 +212,19 @@ function TasksTab() {
 
 function ProfileTab() {
   const [resume, setResume] = useState('');
-  // For the MVP we surface a local résumé text area that interview
-  // mode reads. Full ProfilesView (Mac) supports multiple profiles +
-  // JD attachments — slated for v0.2.
+  // Persists to electron-store via the settings IPC so interview.askAnswer
+  // (in main) can read the same string without a separate round-trip.
+  // Full ProfilesView (Mac) supports multiple profiles + JD attachments — slated for v0.2.
   useEffect(() => {
-    const stored = localStorage.getItem('keyfloe.resume') ?? '';
-    setResume(stored);
+    let cancelled = false;
+    window.keyfloe.settings.get().then((s) => {
+      if (!cancelled) setResume(s.interviewResume ?? '');
+    });
+    return () => { cancelled = true; };
   }, []);
   function save(next: string) {
     setResume(next);
-    localStorage.setItem('keyfloe.resume', next);
+    window.keyfloe.settings.set({ interviewResume: next });
   }
   return (
     <div className="px-10 py-9 flex flex-col gap-6" style={{ maxWidth: 1100 }}>
