@@ -289,14 +289,14 @@ export function Pill() {
   }, [voice]);
 
   return (
-    <div className="w-screen h-screen p-3 app-drag" style={{ background: 'transparent' }}>
+    <div className="w-screen h-screen p-3 app-drag flex" style={{ background: 'transparent' }}>
       <div
         id="pill-root"
-        className="panel-sculpted flex flex-col gap-2.5 relative"
+        className="panel-sculpted flex flex-col gap-2.5 relative flex-1"
         style={{
-          minWidth: 360,
-          maxWidth: 'calc(100vw - 24px)',
-          width: 'fit-content',
+          minWidth: 0,
+          maxWidth: '100%',
+          minHeight: 0,
           padding: 14,
           borderRadius: 22,
           background: 'var(--paper)',
@@ -350,13 +350,15 @@ export function Pill() {
           </button>
         </div>
 
-        {/* Body */}
-        <div className="app-no-drag">
+        {/* Body — flex-1 so it fills the space between header and input,
+            min-h-0 so it can shrink inside a flex column without pushing
+            the input row off-screen, overflow-y-auto so messages scroll
+            inside the pill instead of growing the window forever. */}
+        <div className="app-no-drag flex-1 min-h-0 overflow-y-auto">
           {interview.isRunning && bodyMode === 'transcript' ? (
             <InterviewTranscript state={interview} />
           ) : (
-            <div className="overflow-y-auto flex flex-col gap-2"
-                 style={{ minWidth: 320, maxHeight: 360 }}>
+            <div className="flex flex-col gap-2 h-full">
               {messages.length === 0 && !lastError ? (
                 <SuggestionsHome onPick={(s) => setQuery(s)} />
               ) : (
@@ -375,8 +377,10 @@ export function Pill() {
           )}
         </div>
 
-        {/* Input row */}
-        <div className="app-no-drag bg-bone border border-hairline px-2.5 py-1.5 flex items-end gap-2 rounded-2xl">
+        {/* Input row — flex-shrink: 0 so it's never clipped, even if the
+            window is shorter than the content above it. This was the
+            "no chat input visible" bug on Windows. */}
+        <div className="app-no-drag bg-bone border border-hairline px-2.5 py-1.5 flex items-end gap-2 rounded-2xl flex-shrink-0">
           {voice.kind === 'recording' ? (
             <MicWaveform level={micLevel} active />
           ) : null}

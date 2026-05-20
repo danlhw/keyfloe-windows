@@ -136,10 +136,15 @@ export class WindowManager {
 
   private createPill(): BrowserWindow {
     const win = new BrowserWindow({
-      width: 432,
-      height: 220,
-      minWidth: 360,
-      minHeight: 140,
+      // Start large enough to fit header + suggestions + input without
+      // depending on the renderer-side ResizeObserver firing first. On
+      // virtualized GPUs (Parallels/VMware) the ResizeObserver-driven
+      // grow path doesn't always fire on first paint — content was
+      // getting clipped below the input row.
+      width: 540,
+      height: 380,
+      minWidth: 480,
+      minHeight: 320,
       frame: false,
       transparent: true,
       hasShadow: false,

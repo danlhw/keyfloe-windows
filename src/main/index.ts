@@ -11,11 +11,14 @@ import { installTray } from './tray';
 import { IPC } from '../shared/ipc';
 import { logger } from './log';
 
-// Win32 fix: disable hardware acceleration on machines without a discrete
-// GPU. The transparent pill window flickers on integrated Intel UHD when
-// HW accel is on. Detection is too fiddly to do automatically — we just
-// expose `--no-hw-accel` as an opt-in CLI flag and default-on otherwise.
-if (process.argv.includes('--no-hw-accel')) {
+// Hardware acceleration: disable by default on Windows. The transparent
+// pill window flickers on integrated Intel UHD, and worse, virtualized
+// GPUs (Parallels, VMware, VirtualBox) report HW accel as available but
+// fail to composite transparent always-on-top windows reliably — that's
+// the "window cut off in half / nothing rendering" symptom in a VM. On
+// real Windows laptops the perf hit from disabling HW accel is small;
+// users who want to re-enable can pass `--hw-accel`.
+if (process.platform === 'win32' && !process.argv.includes('--hw-accel')) {
   app.disableHardwareAcceleration();
 }
 
