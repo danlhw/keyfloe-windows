@@ -1,7 +1,7 @@
 {
   "name": "keyfloe-windows",
   "productName": "Keyfloe",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Keyfloe for Windows — native AI companion. Voice in, text out. Right-Ctrl opens a chat pill anchored to the cursor; hold Right-Ctrl to dictate; Interview mode for live call transcription + answer suggestions; Clicky cursor pointer mode for screen-grounded help.",
   "author": "Onefloe",
   "license": "UNLICENSED",
@@ -50,6 +50,10 @@
   "build": {
     "appId": "com.onefloe.keyfloe",
     "productName": "Keyfloe",
+    "copyright": "Copyright © 2026 Onefloe",
+    "npmRebuild": false,
+    "buildDependenciesFromSource": false,
+    "nodeGypRebuild": false,
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -77,7 +81,10 @@
         }
       ],
       "icon": "build/icon.ico",
-      "publisherName": "Onefloe"
+      "legalTrademarks": "Keyfloe™ Onefloe",
+      "signtoolOptions": {
+        "publisherName": "Onefloe"
+      }
     },
     "nsis": {
       "oneClick": false,
