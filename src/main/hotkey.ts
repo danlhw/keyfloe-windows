@@ -55,7 +55,19 @@ export class HotkeyMonitor {
 
     uIOhook.on('keydown', (e) => {
       if (e.keycode !== this.watchedCode) {
-        // Any other key while we're tracking → chord, disqualify.
+        // AltGr handling: when the user watches RightAlt and their
+        // keyboard is configured as international (most Windows + Mac
+        // keyboards-in-Parallels), Windows synthesizes a CtrlLeft DOWN
+        // immediately before the RightAlt DOWN. Treating this as a
+        // chord disqualifier meant the activation key silently did
+        // nothing for half our users. Fix: if we're watching RightAlt
+        // and the offending key is a Ctrl edge, ignore it.
+        const isAltGrCtrl = this.watchedKey === 'RightAlt'
+          && (e.keycode === UiohookKey.Ctrl || e.keycode === UiohookKey.CtrlRight);
+        if (isAltGrCtrl) {
+          logger.info('hotkey', 'ignoring AltGr ctrl prefix');
+          return;
+        }
         if (this.down) this.chordSeen = true;
         return;
       }
@@ -78,6 +90,11 @@ export class HotkeyMonitor {
     });
 
     uIOhook.on('keyup', (e) => {
+      // Symmetric AltGr handling on keyup — ignore Ctrl edges when we're
+      // watching RightAlt so the chord-state cleanup doesn't trip.
+      const isAltGrCtrl = this.watchedKey === 'RightAlt'
+        && (e.keycode === UiohookKey.Ctrl || e.keycode === UiohookKey.CtrlRight);
+      if (isAltGrCtrl) return;
       if (e.keycode !== this.watchedCode || !this.down) return;
       const held = Date.now() - this.downAt;
       this.down = false;

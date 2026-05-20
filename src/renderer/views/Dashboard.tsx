@@ -409,49 +409,155 @@ function ConversationsTab() {
 // ─── BILLING ───────────────────────────────────────────────────────
 
 function BillingTab() {
+  // Tiers mirror the Mac BillingView.swift exactly:
+  //   Free  $0/mo  $0/yr  — "For tasting the app."
+  //   Hobby $9.99  $89    — "For everyone who wants Floe to be magical."
+  //   Pro   $15    $129   — "For power users, interviewers, and Clicky."
+  // Pro sits in the popular middle slot, slightly elevated.
+  const [period, setPeriod] = useState<'monthly' | 'yearly'>('yearly');
+  type Plan = { id: 'free' | 'hobby' | 'pro'; name: string; tagline: string;
+                monthly: number; yearly: number; features: string[]; cta: string; popular?: boolean; };
+  const plans: Plan[] = [
+    {
+      id: 'free', name: 'Free', tagline: 'For tasting the app.',
+      monthly: 0, yearly: 0,
+      features: ['15 chat turns / day', 'Cloud Whisper dictation', 'Cursor overlay', 'Interview mode (limited)'],
+      cta: 'JUST DOWNLOAD',
+    },
+    {
+      id: 'pro', name: 'Pro', tagline: 'For power users, interviewers, and anyone who wants Clicky to take action.',
+      monthly: 15, yearly: 129,
+      features: ['Everything in Hobby', 'Stealth mode (invisible in Zoom/Meet)', 'Priority Sonnet routing', 'Unlimited interview transcripts', 'Computer Use clicking'],
+      cta: 'GO PRO',
+      popular: true,
+    },
+    {
+      id: 'hobby', name: 'Hobby', tagline: 'For everyone who wants Floe to be magical day-to-day.',
+      monthly: 9.99, yearly: 89,
+      features: ['Unlimited chat', 'Cloud Whisper dictation', 'Interview mode (full)', 'Cursor overlay'],
+      cta: 'START WITH HOBBY',
+    },
+  ];
+
   return (
-    <div className="px-10 py-9 flex flex-col gap-6" style={{ maxWidth: 880 }}>
+    <div className="px-10 py-9 flex flex-col gap-8" style={{ maxWidth: 980 }}>
       <TabHeader
         eyebrow="Billing"
         trailingEyebrow="Three editions"
         title="Pick a "
         italic="tier."
       />
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { name: 'Free',  price: '$0',  features: ['15 chat turns / day', 'Cloud Whisper', 'Right-Ctrl tap / hold'] },
-          { name: 'Hobby', price: '$9',  features: ['Unlimited chat', 'Cloud Whisper', 'Interview mode'] },
-          { name: 'Pro',   price: '$24', features: ['Everything in Hobby', 'Priority routing', 'Stealth mode', 'Sonnet for chat'] },
-        ].map((tier) => (
-          <EditorialCard key={tier.name}>
-            <EditorialEyebrow text={tier.name} />
-            <DisplayTitle leading={tier.price} italic=" / mo" size="md" />
-            <ul className="flex flex-col gap-1.5 pt-2">
-              {tier.features.map((f) => (
-                <li key={f} className="text-ink-600" style={{ fontSize: 13.5 }}>
-                  · {f}
-                </li>
-              ))}
-            </ul>
-            <div className="pt-3">
-              <EditorialButton
-                label={tier.name === 'Free' ? 'Current' : 'Coming soon'}
-                solid={tier.name !== 'Free'}
-                onClick={() => undefined}
-              />
-            </div>
-          </EditorialCard>
-        ))}
+
+      {/* Monthly / Yearly toggle */}
+      <div className="flex justify-center">
+        <div className="inline-flex rounded-full border border-hairline overflow-hidden">
+          {(['monthly', 'yearly'] as const).map((p) => {
+            const on = period === p;
+            return (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPeriod(p)}
+                className="font-pixel px-5 py-2 transition"
+                style={{
+                  fontSize: 10.5, letterSpacing: '0.16em',
+                  background: on ? 'var(--ink-900)' : 'transparent',
+                  color: on ? 'var(--paper)' : 'var(--ink-600)',
+                }}
+              >
+                {p === 'monthly' ? 'MONTHLY' : 'YEARLY · SAVE 25%'}
+              </button>
+            );
+          })}
+        </div>
       </div>
-      <p className="text-ink-400 pt-4" style={{ fontSize: 12 }}>
-        Billing flows route through the same Lemon Squeezy webhook the
-        Mac app uses. Wire-up is on the v0.2 milestone.
+
+      {/* Plan grid — Pro in middle, slightly elevated */}
+      <div className="grid grid-cols-3 gap-5 items-stretch">
+        {plans.map((plan) => {
+          const isPro = plan.id === 'pro';
+          const price = period === 'monthly' ? plan.monthly : plan.yearly / 12;
+          const priceLabel = price === 0 ? '$0' : `$${price < 1 ? price.toFixed(0) : price.toFixed(2)}`;
+          return (
+            <div
+              key={plan.id}
+              className={[
+                'rounded-2xl p-6 flex flex-col gap-3 transition',
+                'border border-hairline',
+                isPro ? 'bg-ink-900 text-paper -mt-2' : 'bg-paper text-ink-900',
+              ].join(' ')}
+              style={{
+                boxShadow: isPro
+                  ? '0 12px 32px rgba(10,10,11,0.28), inset 0 1px 0 rgba(255,255,255,0.10)'
+                  : '0 4px 16px rgba(10,10,11,0.08)',
+              }}
+            >
+              {isPro && (
+                <div className="font-pixel self-start" style={{
+                  fontSize: 9, letterSpacing: '0.2em',
+                  padding: '3px 8px', borderRadius: 999,
+                  background: 'color-mix(in srgb, var(--paper) 18%, transparent)',
+                  color: 'var(--paper)',
+                }}>MOST CHOSEN</div>
+              )}
+              <div className="font-pixel" style={{ fontSize: 10.5, letterSpacing: '0.18em',
+                  color: isPro ? 'color-mix(in srgb, var(--paper) 70%, transparent)' : 'var(--ink-600)' }}>
+                {plan.name.toUpperCase()}
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="font-display" style={{ fontSize: 44, lineHeight: 1, fontWeight: 300 }}>
+                  {priceLabel}
+                </span>
+                <span style={{ fontSize: 12, opacity: 0.7 }}>/ mo</span>
+              </div>
+              {period === 'yearly' && price > 0 && (
+                <div style={{ fontSize: 11, opacity: 0.7 }}>billed ${plan.yearly} yearly</div>
+              )}
+              <p style={{ fontSize: 13, lineHeight: 1.45, opacity: 0.85 }}>{plan.tagline}</p>
+              <ul className="flex flex-col gap-1.5 pt-2">
+                {plan.features.map((f) => (
+                  <li key={f} className="flex items-start gap-2" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
+                    <span style={{ opacity: 0.6 }}>·</span>
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="pt-3 mt-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (plan.id === 'free') return;
+                    // TODO v0.2 — wire Lemon Squeezy checkout URLs.
+                    window.open('https://keyfloe.com/#pricing', '_blank');
+                  }}
+                  className={[
+                    'w-full font-pixel rounded-lg py-3 transition',
+                    isPro
+                      ? 'bg-paper text-ink-900 hover:brightness-95'
+                      : 'bg-ink-900 text-paper hover:brightness-110',
+                  ].join(' ')}
+                  style={{ fontSize: 11, letterSpacing: '0.18em' }}
+                >
+                  {plan.cta}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-ink-400 pt-2 text-center" style={{ fontSize: 12 }}>
+        Same Lemon Squeezy checkout the Mac app uses. Cancel anytime.
       </p>
     </div>
   );
 }
 
 // ─── SETTINGS ──────────────────────────────────────────────────────
+// Matches Mac SettingsView.swift sections: Activation key, Appearance,
+// Stealth mode, Privacy & Data. NO API key fields — Keyfloe routes all
+// traffic through the Worker. NO Worker URL field (advanced users can
+// edit config.json directly).
 
 function SettingsTab() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -466,7 +572,12 @@ function SettingsTab() {
   }
   if (!settings) return <div className="p-10 text-ink-600">Loading…</div>;
 
-  const keys: ActivationKey[] = ['RightCtrl', 'RightAlt', 'CapsLock', 'F8'];
+  const keys: { key: ActivationKey; label: string; hint?: string }[] = [
+    { key: 'RightAlt',  label: 'RIGHT ALT',  hint: 'recommended — works on MacBook (right Option) and any Windows keyboard' },
+    { key: 'RightCtrl', label: 'RIGHT CTRL', hint: 'most Windows keyboards; not on MacBook' },
+    { key: 'CapsLock',  label: 'CAPS LOCK',  hint: 'replaces normal Caps Lock' },
+    { key: 'F8',        label: 'F8',         hint: 'safe on every keyboard' },
+  ];
 
   return (
     <div className="px-10 py-9 flex flex-col gap-0" style={{ maxWidth: 880 }}>
@@ -478,129 +589,195 @@ function SettingsTab() {
       />
 
       <div className="flex flex-col gap-14">
-
+        {/* Activation key */}
         <EditorialCard>
           <SectionHeading title="Activation " italic="key." />
           <p className="text-ink-600" style={{ fontSize: 14 }}>
-            Pick which key opens Keyfloe. Press once for the chat pill,
+            Pick which key opens Keyfloe. Tap to open the chat pill,
             hold to dictate.
           </p>
-          <div className="flex gap-2 pt-2 flex-wrap">
-            {keys.map((k) => {
-              const active = settings.activationKey === k;
+          <div className="flex flex-col gap-2 pt-3">
+            {keys.map(({ key, label, hint }) => {
+              const active = settings.activationKey === key;
               return (
                 <button
-                  key={k}
-                  onClick={() => save({ activationKey: k })}
+                  key={key}
+                  onClick={() => save({ activationKey: key })}
                   className={[
-                    'editorial-button app-no-drag',
-                    active ? 'solid' : '',
+                    'app-no-drag flex items-center justify-between px-4 py-3 rounded-lg border transition',
+                    active
+                      ? 'border-ink-900 bg-ink-900 text-paper'
+                      : 'border-hairline bg-bone text-ink-900 hover:bg-paper',
                   ].join(' ')}
+                  style={{ fontSize: 13 }}
                 >
-                  {k.toUpperCase()}
+                  <span className="font-pixel" style={{ letterSpacing: '0.16em' }}>{label}</span>
+                  <span style={{ fontSize: 11, opacity: 0.7 }}>{hint}</span>
                 </button>
               );
             })}
           </div>
-          <p className="text-ink-400 pt-2" style={{ fontSize: 12 }}>
-            Windows laptops have an Fn key, but firmware (the EC) consumes
-            it before the OS sees it, so software hooks can't read it.
-            Right-Ctrl is the closest analog.
+          <p className="text-ink-400 pt-3" style={{ fontSize: 12 }}>
+            Note: Windows can't see the Fn key (firmware swallows it before the OS sees it).
+            Right-Alt is the closest analog and works through Parallels too.
           </p>
         </EditorialCard>
 
+        {/* Appearance */}
         <EditorialCard>
-          <SectionHeading title="Speech " italic="model." />
+          <SectionHeading title="Appearance." />
           <p className="text-ink-600" style={{ fontSize: 14 }}>
-            Whisper is run on the Cloudflare Worker for now. On-device
-            whisper.cpp with DirectML acceleration is in the roadmap.
+            Light, dark, or follow your Windows setting.
           </p>
-          <select
-            value={settings.whisperModel}
-            onChange={(e) => save({ whisperModel: e.target.value as AppSettings['whisperModel'] })}
-            className="border border-hairline bg-paper text-ink-900 px-3 py-2 mt-2"
-            style={{ fontSize: 14 }}
-          >
-            <option value="tiny">Tiny (75 MB, fastest)</option>
-            <option value="base">Base (150 MB)</option>
-            <option value="small">Small (500 MB)</option>
-            <option value="medium">Medium (1.5 GB)</option>
-            <option value="large-v3-turbo">Large v3 Turbo (1.6 GB, best)</option>
-          </select>
-        </EditorialCard>
-
-        <EditorialCard>
-          <SectionHeading title="Stealth " italic="mode." />
-          <p className="text-ink-600" style={{ fontSize: 14 }}>
-            Hides the pill and cursor overlay from screen recordings.
-          </p>
-          <label className="flex items-center gap-2 pt-2 text-ink-900" style={{ fontSize: 14 }}>
-            <input
-              type="checkbox"
-              checked={settings.stealthMode}
-              onChange={(e) => save({ stealthMode: e.target.checked })}
-            />
-            Enable stealth mode
-          </label>
-        </EditorialCard>
-
-        <EditorialCard>
-          <SectionHeading title="API " italic="keys." />
-          <p className="text-ink-600" style={{ fontSize: 14 }}>
-            Optional. If set, Keyfloe calls Anthropic / OpenAI directly
-            and bypasses the Cloudflare Worker's free-tier quota.
-          </p>
-          <div className="flex flex-col gap-2 pt-2">
-            <KeyField
-              label="Anthropic API key"
-              value={settings.anthropicApiKey ?? ''}
-              onChange={(v) => save({ anthropicApiKey: v || null })}
-            />
-            <KeyField
-              label="OpenAI API key (for Whisper)"
-              value={settings.openaiApiKey ?? ''}
-              onChange={(v) => save({ openaiApiKey: v || null })}
-            />
-          </div>
-        </EditorialCard>
-
-        <EditorialCard>
-          <SectionHeading title="Worker " italic="URL." />
-          <p className="text-ink-600" style={{ fontSize: 14 }}>
-            Backend that proxies Claude + Whisper. Override to point
-            at a local <code>wrangler dev</code>.
-          </p>
-          <input
-            type="text"
-            defaultValue={settings.workerUrl}
-            onBlur={(e) => save({ workerUrl: e.target.value })}
-            className="w-full border border-hairline bg-paper text-ink-900 px-3 py-2 mt-2 font-pixel"
-            style={{ fontSize: 13 }}
+          <RadioRow
+            value={settings.appearance}
+            onChange={(v) => save({ appearance: v as AppSettings['appearance'] })}
+            options={[
+              { value: 'system', label: 'Follow system' },
+              { value: 'light',  label: 'Always light' },
+              { value: 'dark',   label: 'Always dark' },
+            ]}
           />
+        </EditorialCard>
+
+        {/* Stealth mode */}
+        <EditorialCard>
+          <div className="flex items-center justify-between">
+            <SectionHeading title="Stealth " italic="mode." />
+            <ProBadge />
+          </div>
+          <p className="text-ink-600" style={{ fontSize: 14 }}>
+            Hides the Keyfloe pill and cursor overlay from screen recordings
+            (Zoom, Meet, Teams, OBS — every tool that uses the standard
+            Windows capture pipeline). Pro users are stealth by default
+            whenever the pill is open.
+          </p>
+          <RadioRow
+            value={settings.stealthMode}
+            onChange={(v) => save({ stealthMode: v as AppSettings['stealthMode'] })}
+            options={[
+              { value: 'auto',       label: 'Default — invisible when the pill is open' },
+              { value: 'always-on',  label: 'Always invisible to screen recordings' },
+              { value: 'always-off', label: 'Always visible' },
+            ]}
+          />
+        </EditorialCard>
+
+        {/* Dictation */}
+        <EditorialCard>
+          <SectionHeading title="Dictation" italic=" (push-to-talk)." />
+          <p className="text-ink-600" style={{ fontSize: 14 }}>
+            Hold the activation key anywhere on your PC to speak. Release and
+            the transcribed text pastes into whatever text field has focus —
+            Slack, Outlook, the Keyfloe pill, anywhere.
+          </p>
+          <p className="text-ink-400 pt-2" style={{ fontSize: 12 }}>
+            Transcription runs on our server for now. On-device whisper.cpp
+            with GPU acceleration is on the v0.2 roadmap.
+          </p>
+        </EditorialCard>
+
+        {/* Intelligence */}
+        <EditorialCard>
+          <SectionHeading title="Intelligence." />
+          <p className="text-ink-600" style={{ fontSize: 14 }}>
+            Default replies use a fast, cheap model so the pill answers in a
+            beat. Flip the brain icon in the pill to switch to a heavier
+            model for deeper reasoning.
+          </p>
+        </EditorialCard>
+
+        {/* Privacy & Data */}
+        <EditorialCard>
+          <SectionHeading title="Privacy & " italic="data." />
+          <p className="text-ink-600" style={{ fontSize: 14 }}>
+            Keyfloe stores conversations + dictation history locally on your
+            PC under <code className="font-pixel">%APPDATA%\Keyfloe</code>.
+            None of it is uploaded.
+          </p>
+          <div className="flex flex-wrap gap-2 pt-3">
+            <button
+              type="button"
+              className="editorial-button app-no-drag"
+              onClick={() => {
+                if (confirm('Clear all dictation history? This cannot be undone.')) {
+                  localStorage.removeItem('keyfloe.dictations');
+                  window.dispatchEvent(new Event('storage'));
+                }
+              }}
+            >
+              Clear dictations
+            </button>
+            <button
+              type="button"
+              className="editorial-button app-no-drag"
+              onClick={() => {
+                if (confirm('Clear all chat conversations? This cannot be undone.')) {
+                  localStorage.removeItem('keyfloe.conversations');
+                  window.dispatchEvent(new Event('storage'));
+                }
+              }}
+            >
+              Clear conversations
+            </button>
+          </div>
         </EditorialCard>
       </div>
     </div>
   );
 }
 
-function KeyField({ label, value, onChange }: {
-  label: string; value: string; onChange: (v: string) => void;
+function RadioRow({
+  value, onChange, options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
 }) {
-  const [v, setV] = useState(value);
-  useEffect(() => setV(value), [value]);
   return (
-    <label className="flex flex-col gap-1">
-      <span className="pixel-eyebrow text-ink-600">{label}</span>
-      <input
-        type="password"
-        value={v}
-        onChange={(e) => setV(e.target.value)}
-        onBlur={() => onChange(v)}
-        placeholder="paste key, leave empty to use the Worker"
-        className="border border-hairline bg-paper text-ink-900 px-3 py-2 font-pixel"
-        style={{ fontSize: 13 }}
-      />
-    </label>
+    <div className="flex flex-col gap-1.5 pt-3">
+      {options.map((opt) => {
+        const on = opt.value === value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={[
+              'app-no-drag flex items-center gap-3 px-3 py-2.5 rounded-lg border transition text-left',
+              on ? 'border-ink-900 bg-bone' : 'border-hairline bg-paper hover:bg-bone',
+            ].join(' ')}
+            style={{ fontSize: 13 }}
+          >
+            <span
+              className="flex items-center justify-center"
+              style={{
+                width: 16, height: 16, borderRadius: 999,
+                border: '1.5px solid var(--ink-900)',
+              }}
+            >
+              {on && <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--ink-900)' }} />}
+            </span>
+            <span className="text-ink-900">{opt.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProBadge() {
+  return (
+    <span
+      className="font-pixel"
+      style={{
+        fontSize: 9, letterSpacing: '0.18em',
+        padding: '3px 8px', borderRadius: 999,
+        background: 'var(--ink-900)', color: 'var(--paper)',
+      }}
+    >
+      PRO
+    </span>
   );
 }
 

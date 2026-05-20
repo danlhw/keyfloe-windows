@@ -50,16 +50,34 @@ export interface InterviewState {
 // under 'activationKey' so the user's Settings choice survives restart.
 export type ActivationKey = 'RightCtrl' | 'RightAlt' | 'CapsLock' | 'F8';
 
+// Appearance — tri-state, matching Mac's AppearanceController:
+//   system → follow OS prefers-color-scheme
+//   light  → force light
+//   dark   → force dark
+export type Appearance = 'system' | 'light' | 'dark';
+
+// Stealth — tri-state, matching Mac's StealthMode:
+//   auto       → invisible to screen recordings when pill is open
+//   always-on  → always invisible
+//   always-off → always visible (default macOS behavior)
+export type StealthMode = 'auto' | 'always-on' | 'always-off';
+
 export interface AppSettings {
   activationKey: ActivationKey;
-  stealthMode: boolean;
+  stealthMode: StealthMode;
+  appearance: Appearance;
   proReasoning: boolean;
   whisperModel: 'tiny' | 'base' | 'small' | 'medium' | 'large-v3-turbo';
   workerUrl: string;
+  // BYOK kept in the shape (so dev/power-user override still works via
+  // the electron-store file) but the Settings UI no longer surfaces
+  // these fields — Keyfloe is SaaS, all traffic goes through the Worker.
   anthropicApiKey: string | null;
   deepseekApiKey: string | null;
   openaiApiKey: string | null;
   interviewResume: string | null;
+  // Onboarding state — true after first launch is acknowledged.
+  onboardingComplete: boolean;
 }
 
 // Clicky pointer state — drives the transparent overlay window.

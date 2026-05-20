@@ -101,6 +101,11 @@ class Keyfloe {
       // Hotkey rebind: if the activation key changed, re-install the
       // global hook so the next press uses the new binding.
       if (next?.activationKey) this.hotkey.rebind(next.activationKey);
+      // Stealth rebind: re-apply Content Protection across every window
+      // that should be invisible to screen recordings (pill + overlays).
+      // On Windows this calls SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE);
+      // on macOS dev runs it sets kCGSWindowSharingNone equivalent.
+      if (next?.stealthMode !== undefined) this.windows.applyStealth(updated.stealthMode);
       BrowserWindow.getAllWindows().forEach((w) =>
         w.webContents.send(IPC.settingsChanged, updated)
       );

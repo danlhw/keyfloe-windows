@@ -31,24 +31,56 @@
 }
 
 /* ─── Editorial palette tokens (matches OneClickStyle.swift) ─────
-   Paper / bone / ink palette — warm cream + deep ink. Auto-flips in
-   dark mode via the media query at the bottom. */
-:root {
-  --paper:   #f5f1ea;
-  --bone:    #ebe5d9;
-  --ink-900: #0a0a0b;
-  --ink-600: #5b5b5e;
-  --ink-400: #9a9a9d;
+   Paper / bone / ink palette. Three-way appearance:
+     - data-theme="light"  → always light
+     - data-theme="dark"   → always dark
+     - data-theme="system" → follow OS via prefers-color-scheme
+   Set by ThemeProvider on document.documentElement on app boot
+   + whenever the user changes Settings → Appearance. */
+:root, [data-theme="light"] {
+  --paper:    #f5f1ea;
+  --bone:     #ebe5d9;
+  --ink-900:  #0a0a0b;
+  --ink-600:  #5b5b5e;
+  --ink-400:  #9a9a9d;
   --hairline: rgba(10, 10, 11, 0.15);
+  --accent:   #3b82f6;
+  --danger:   #ef4444;
+  --live:     #20c55c;
+}
+[data-theme="dark"] {
+  --paper:    #0d0d0e;
+  --bone:     #18181b;
+  --ink-900:  #f5f1ea;
+  --ink-600:  #a3a3a6;
+  --ink-400:  #78787c;
+  --hairline: rgba(245, 241, 234, 0.12);
+  --accent:   #60a5fa;
+  --danger:   #f87171;
+  --live:     #20c55c;
+}
+[data-theme="system"] {
+  --paper:    #f5f1ea;
+  --bone:     #ebe5d9;
+  --ink-900:  #0a0a0b;
+  --ink-600:  #5b5b5e;
+  --ink-400:  #9a9a9d;
+  --hairline: rgba(10, 10, 11, 0.15);
+  --accent:   #3b82f6;
+  --danger:   #ef4444;
+  --live:     #20c55c;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
-    --paper:   #0d0d0e;
-    --bone:    #18181b;
-    --ink-900: #f5f1ea;
-    --ink-600: #a3a3a6;
-    --ink-400: #78787c;
+  [data-theme="system"] {
+    --paper:    #0d0d0e;
+    --bone:     #18181b;
+    --ink-900:  #f5f1ea;
+    --ink-600:  #a3a3a6;
+    --ink-400:  #78787c;
     --hairline: rgba(245, 241, 234, 0.12);
+    --accent:   #60a5fa;
+    --danger:   #f87171;
+    --live:     #20c55c;
   }
 }
 
@@ -186,6 +218,210 @@ body.paper {
 ::-webkit-scrollbar-thumb { background: var(--hairline); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--ink-400); }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ─── Pill glass background ─────────────────────────────────────
+   Closest analog to macOS NSVisualEffectView .hudWindow / Glass(.regular).
+   Stacked on top of the always-transparent Electron BrowserWindow so the
+   blur picks up whatever's behind the window. backdrop-filter is the only
+   way to do real blur in CSS — falls back to a solid bg on Win10 without
+   composition acceleration (looks slightly less dreamy but still polished). */
+.pill-glass {
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 0.5px solid var(--hairline);
+  border-radius: 22px;
+  box-shadow:
+    inset 0 0   0 0.5px color-mix(in srgb, var(--ink-900) 8%, transparent),
+    inset 0 1px 0 0    color-mix(in srgb, var(--paper)   50%, transparent),
+    0 0 0 1px           color-mix(in srgb, var(--ink-900) 4%, transparent),
+    0 12px 36px         color-mix(in srgb, var(--ink-900) 22%, transparent);
+}
+.pill-glass[data-stealth="true"] {
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+}
+
+/* Soft input row inside the pill — matches Mac PillView's `.bone` input bg */
+.pill-input-row {
+  background: color-mix(in srgb, var(--bone) 70%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 0.5px solid var(--hairline);
+  border-radius: 10px;
+}
+.pill-input-row[data-stealth="true"] {
+  background: color-mix(in srgb, var(--bone) 40%, transparent);
+}
+
+/* Status chip in the pill header */
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'DepartureMono', ui-monospace, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper) 80%, transparent);
+  border: 0.5px solid var(--hairline);
+  color: var(--ink-900);
+}
+.status-chip[data-variant="live"] { color: var(--live); }
+.status-chip[data-variant="ok"]   { color: var(--live); }
+.status-chip[data-variant="ink"]  { background: var(--ink-900); color: var(--paper); border-color: var(--ink-900); }
+
+/* Round icon button — used for every action in the pill input row */
+.icon-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--ink-600);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+  flex-shrink: 0;
+}
+.icon-btn:hover { color: var(--ink-900); background: color-mix(in srgb, var(--ink-900) 6%, transparent); }
+.icon-btn:active { transform: scale(0.94); }
+.icon-btn[data-on="true"] { color: var(--accent); }
+.icon-btn[data-on="true"][data-tone="purple"] { color: #a855f7; }
+.icon-btn[data-on="true"][data-tone="red"]    { color: #ef4444; }
+.icon-btn[data-disabled="true"] { color: var(--ink-400); cursor: not-allowed; }
+
+/* Pill send button — solid accent with arrow */
+.send-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+  border: 0;
+  cursor: pointer;
+  transition: filter 120ms ease, transform 120ms ease;
+  flex-shrink: 0;
+}
+.send-btn:hover  { filter: brightness(1.1); }
+.send-btn:active { transform: scale(0.94); }
+.send-btn:disabled {
+  background: color-mix(in srgb, var(--ink-900) 12%, transparent);
+  color: var(--ink-400);
+  cursor: not-allowed;
+}
+
+/* Suggestion chips (pill empty state) */
+.suggestion-chip {
+  appearance: none;
+  background: color-mix(in srgb, var(--bone) 50%, transparent);
+  backdrop-filter: blur(6px);
+  border: 0.5px solid var(--hairline);
+  color: var(--ink-900);
+  font-size: 11.5px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease;
+  text-align: left;
+}
+.suggestion-chip:hover { background: color-mix(in srgb, var(--paper) 70%, transparent); }
+.suggestion-chip:active { transform: scale(0.97); }
+.suggestion-chip[data-selected="true"] {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+/* Reply chip (pill input header when replying) */
+.reply-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bone) 60%, transparent);
+  border: 0.5px solid var(--hairline);
+  font-size: 11.5px;
+}
+
+/* Notch — the dark top-of-screen pill that hangs below the menu bar */
+.notch-shell {
+  position: relative;
+  background: #0d0d0e;
+  color: #f5f1ea;
+  border-radius: 0 0 18px 18px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  transition: width 280ms cubic-bezier(0.34, 1.2, 0.64, 1), height 280ms cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+.notch-icon-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: rgba(245, 241, 234, 0.78);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.notch-icon-btn:hover {
+  background: rgba(245, 241, 234, 0.12);
+  color: #f5f1ea;
+}
+.notch-icon-btn[data-on="true"][data-tone="red"]  { color: #ef4444; }
+.notch-icon-btn[data-on="true"][data-tone="blue"] { color: #60a5fa; }
+
+/* Bubble for chat messages — iMessage-style */
+.bubble-user {
+  background: var(--accent);
+  color: white;
+  border-radius: 14px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  align-self: flex-end;
+  max-width: 85%;
+  word-wrap: break-word;
+}
+.bubble-assistant {
+  background: color-mix(in srgb, var(--bone) 60%, transparent);
+  color: var(--ink-900);
+  border: 0.5px solid var(--hairline);
+  border-radius: 14px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  align-self: flex-start;
+  max-width: 85%;
+  word-wrap: break-word;
+}
+
+/* Fade-in for notch state transitions (compact → expanded) */
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fadein { animation: fadein 240ms cubic-bezier(0.34, 1.1, 0.64, 1); }
+
+/* Animate-pulse — for the dictation "transcribing" mic icon */
+@keyframes pulse-icon {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+.animate-pulse { animation: pulse-icon 1.4s ease-in-out infinite; }
 
 /* Mic waveform bars — pulse with the captured level. */
 .mic-bar {

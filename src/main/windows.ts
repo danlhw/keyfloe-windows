@@ -47,6 +47,10 @@ export class WindowManager {
     // Overlays are lazy on first pointer target.
     this.createNotch();
     this.pill = this.createPill();
+    // Apply Content Protection now — settings on first launch are 'auto',
+    // which we map to ON for the pill so an interview screen-share never
+    // leaks the chat surface even if the user never opens Settings.
+    import('./settings').then(({ settings }) => this.applyStealth(settings.stealthMode));
 
     // Reposition the notch when the display topology changes.
     screen.on('display-added',           () => this.repositionNotch());
@@ -141,10 +145,12 @@ export class WindowManager {
       // virtualized GPUs (Parallels/VMware) the ResizeObserver-driven
       // grow path doesn't always fire on first paint — content was
       // getting clipped below the input row.
-      width: 540,
-      height: 380,
+      width: 600,
+      height: 440,
       minWidth: 480,
       minHeight: 320,
+      maxWidth: 900,
+      maxHeight: 800,
       frame: false,
       transparent: true,
       hasShadow: false,
@@ -263,6 +269,33 @@ export class WindowManager {
   }
 
   overlayWindows() { return this.overlays.filter((w) => !w.isDestroyed()); }
+
+  // ─── Stealth — hide from screen recordings ──────────────────────
+  //
+  // Electron's setContentProtection(true) calls:
+  //   • Windows → SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE) so
+  //     screen-recording tools (Zoom, Meet, Teams, OBS, anything using
+  //     the standard Graphics Capture pipeline) see a black rectangle
+  //     where our window is.
+  //   • macOS → kCGSWindowSharingNone (same idea on Mac).
+  //   • Linux → no-op (X11 doesn't expose this gate).
+  //
+  // Tri-state behavior (matches Mac StealthMode):
+  //   'auto'       → on by default for the pill + overlay (the surfaces
+  //                  that actually leak interview/clicky content).
+  //   'always-on'  → on for every window.
+  //   'always-off' → off everywhere (default macOS behavior).
+  applyStealth(mode: 'auto' | 'always-on' | 'always-off') {
+    const on = mode !== 'always-off';
+    if (this.pill && !this.pill.isDestroyed()) this.pill.setContentProtection(on);
+    this.overlays.forEach((w) => {
+      if (!w.isDestroyed()) w.setContentProtection(on);
+    });
+    // The notch is intentionally NOT stealth-protected even in always-on
+    // mode — users need to be able to see it on a Zoom call to access
+    // the dashboard. Same call the Mac makes (notch is exempt).
+    logger.info('stealth', `applied mode=${mode} on=${on}`);
+  }
 
   // ─── Screen capture ─────────────────────────────────────────────
 

@@ -7,8 +7,15 @@ import { DEFAULT_WORKER_URL } from '../shared/endpoints';
 // objects) so partial-update bugs in the renderer are impossible —
 // every set replaces the whole record.
 const defaults: AppSettings = {
-  activationKey: 'RightCtrl',
-  stealthMode: false,
+  // Right-Alt is the safer default than Right-Ctrl on Windows because:
+  //  (a) MacBook keyboards (which Mac-dev testers use via Parallels) don't
+  //      have a Right-Ctrl key, so users couldn't trigger the activation
+  //      key at all on first launch;
+  //  (b) Right-Ctrl is intercepted by some RDP clients before it reaches
+  //      the VM, leading to "the hotkey doesn't work" reports.
+  activationKey: 'RightAlt',
+  stealthMode: 'auto',
+  appearance: 'system',
   proReasoning: false,
   whisperModel: 'base',
   workerUrl: DEFAULT_WORKER_URL,
@@ -16,6 +23,7 @@ const defaults: AppSettings = {
   deepseekApiKey: null,
   openaiApiKey: null,
   interviewResume: null,
+  onboardingComplete: false,
 };
 
 const store = new Store<AppSettings>({
