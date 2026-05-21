@@ -131,7 +131,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [customizable, setCustomizable] = useState<CustomizableState>(
     DEFAULT_CUSTOMIZABLE_STATE
   );
-  const [hasActiveLicense, setHasActiveLicense] = useState<boolean>(false);
+  // Keyfloe ships with no paywall — license is always active so the
+  // drag region, chat completion, theme picker, and shortcut config
+  // are unlocked from first launch. Reverts to Pluely's gated behavior
+  // would mean flipping this back to false.
+  const [hasActiveLicense, setHasActiveLicense] = useState<boolean>(true);
   const [supportsImages, setSupportsImagesState] = useState<boolean>(() => {
     const stored = safeLocalStorage.getItem(STORAGE_KEYS.SUPPORTS_IMAGES);
     return stored === null ? true : stored === "true";
@@ -143,48 +147,36 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     safeLocalStorage.setItem(STORAGE_KEYS.SUPPORTS_IMAGES, String(value));
   };
 
-  // Keyfloe API State
-  const [keyfloeApiEnabled, setKeyfloeApiEnabledState] = useState<boolean>(
-    safeLocalStorage.getItem(STORAGE_KEYS.KEYFLOE_API_ENABLED) === "true"
-  );
+  // Keyfloe doesn't run a separate billing/API backend the way Pluely
+  // does. We keep the local "keyfloeApiEnabled" boolean for code paths
+  // that read it (Sidebar promotional UI, etc.), but it's always false —
+  // chat goes directly through the configured AI provider (Claude, etc.)
+  // with the user's baked-in or BYOK API key.
+  const [keyfloeApiEnabled, setKeyfloeApiEnabledState] = useState<boolean>(false);
 
+  // Stripped: no remote license validation. The original Pluely codebase
+  // called invoke("validate_license_api") which hit Pluely's license
+  // server. Keyfloe ships as a self-contained app with no paywall, so
+  // this is a no-op that always reports "active" — that unlocks the
+  // drag region, chat completion, themes, and other gated features.
   const getActiveLicenseStatus = async () => {
-    const response: { is_active: boolean; is_dev_license: boolean } =
-      await invoke("validate_license_api");
-    setHasActiveLicense(response.is_active);
-
-    if (response?.is_dev_license) {
-      setKeyfloeApiEnabled(false);
-    }
-
-    // Check if the auto configs are enabled
-    const autoConfigsEnabled = localStorage.getItem("auto-configs-enabled");
-    if (response.is_active && !autoConfigsEnabled) {
-      setScreenshotConfiguration({
-        mode: "auto",
-        autoPrompt: "Analyze the screenshot and provide insights",
-        enabled: false,
-      });
-      // Set the flag to true so that we don't change the mode again
-      localStorage.setItem("auto-configs-enabled", "true");
-    }
+    setHasActiveLicense(true);
   };
 
+  // Stripped: don't push license state to the Rust side anymore. The
+  // Rust validate_license_api / set_license_status commands stay in
+  // src-tauri/ as dead code (still callable, just never invoked from
+  // JS) — leaving them avoids touching the Rust layer needlessly.
   useEffect(() => {
-    const syncLicenseState = async () => {
+    // Just keep the shortcuts config in sync; the license invoke is gone.
+    (async () => {
       try {
-        await invoke("set_license_status", {
-          hasLicense: hasActiveLicense,
-        });
-
         const config = getShortcutsConfig();
         await invoke("update_shortcuts", { config });
       } catch (error) {
-        console.error("Failed to synchronize license state:", error);
+        console.error("Failed to sync shortcuts:", error);
       }
-    };
-
-    syncLicenseState();
+    })();
   }, [hasActiveLicense]);
 
   // Function to load AI, STT, system prompt and screenshot config data from storage
@@ -236,12 +228,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     setCustomSttProviders(sttList);
 
-    // Load selected AI provider
+    // Load selected AI provider, OR seed a default Claude provider on
+    // first launch using the build-time API key (VITE_BAKED_ANTHROPIC_KEY).
+    // If no baked key is present, the user can still configure their own
+    // key via Settings — the default just leaves it blank.
     const savedSelectedAi = safeLocalStorage.getItem(
       STORAGE_KEYS.SELECTED_AI_PROVIDER
     );
     if (savedSelectedAi) {
       setSelectedAIProvider(JSON.parse(savedSelectedAi));
+    } else {
+      const bakedKey = (import.meta.env.VITE_BAKED_ANTHROPIC_KEY as string | undefined) ?? "";
+      const defaultClaude = {
+        provider: "claude",
+        variables: {
+          API_KEY: bakedKey,
+          MODEL: "claude-3-5-sonnet-latest",
+        },
+      };
+      setSelectedAIProvider(defaultClaude);
+      safeLocalStorage.setItem(
+        STORAGE_KEYS.SELECTED_AI_PROVIDER,
+        JSON.stringify(defaultClaude)
+      );
     }
 
     // Load selected STT provider
@@ -276,13 +285,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
-    // Load Keyfloe API enabled state
-    const savedKeyfloeApiEnabled = safeLocalStorage.getItem(
-      STORAGE_KEYS.KEYFLOE_API_ENABLED
-    );
-    if (savedKeyfloeApiEnabled !== null) {
-      setKeyfloeApiEnabledState(savedKeyfloeApiEnabled === "true");
-    }
+    // Keyfloe API mode is always OFF — chat goes through the configured
+    // provider directly. Skip the localStorage read so a stale value
+    // from an earlier Pluely install doesn't accidentally re-enable a
+    // backend we don't have.
+    setKeyfloeApiEnabledState(false);
 
     // Load selected audio devices
     const savedAudioDevices = safeLocalStorage.getItem(
