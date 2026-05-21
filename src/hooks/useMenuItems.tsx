@@ -81,18 +81,18 @@ export const useMenuItems = () => {
           {
             icon: MailIcon,
             label: "Contact Support",
-            href: "mailto:support@pluely.com",
+            href: "mailto:support@keyfloe.com",
           },
         ]
       : []),
     {
       icon: BugIcon,
       label: "Report a bug",
-      href: "https://github.com/iamsrikanthnani/pluely/issues/new?template=bug-report.yml",
+      href: "https://github.com/danlhw/keyfloe-windows/issues/new?template=bug-report.yml",
     },
     {
       icon: PowerIcon,
-      label: "Quit pluely",
+      label: "Quit keyfloe",
       action: async () => {
         await invoke("exit_app");
       },
@@ -107,22 +107,22 @@ export const useMenuItems = () => {
     {
       title: "Website",
       icon: GlobeIcon,
-      link: "https://pluely.com",
+      link: "https://keyfloe.com",
     },
     {
       title: "Github",
       icon: GithubIcon,
-      link: "https://github.com/iamsrikanthnani/pluely",
+      link: "https://github.com/danlhw/keyfloe-windows",
     },
     {
       title: "Buy Me a Coffee",
       icon: CoffeeIcon,
-      link: "https://buymeacoffee.com/srikanthnani",
+      link: "https://buymeacoffee.com/onefloe",
     },
     {
       title: "Follow on X",
       icon: XIcon,
-      link: "https://x.com/srikanthnani",
+      link: "https://x.com/onefloe",
     },
   ];
 

@@ -1,2 +1,2 @@
-export * from "./PluelyApiSetup";
+export * from "./KeyfloeApiSetup";
 export * from "./Usage";

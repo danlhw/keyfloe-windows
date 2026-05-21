@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { GetLicense } from "@/components";
-import { PluelyApiSetup, Usage } from "./components";
+import { KeyfloeApiSetup, Usage } from "./components";
 import { PageLayout } from "@/layouts";
 import { useApp } from "@/contexts";
 
@@ -49,11 +49,11 @@ const Dashboard = () => {
   return (
     <PageLayout
       title="Dashboard"
-      description="Pluely license to unlock faster responses, quicker support and premium features."
+      description="Keyfloe license to unlock faster responses, quicker support and premium features."
       rightSlot={!hasActiveLicense ? <GetLicense /> : null}
     >
-      {/* Pluely API Setup */}
-      <PluelyApiSetup />
+      {/* Keyfloe API Setup */}
+      <KeyfloeApiSetup />
 
       <Usage
         loading={loadingActivity}
