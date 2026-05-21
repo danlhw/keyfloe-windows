@@ -131,7 +131,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [customizable, setCustomizable] = useState<CustomizableState>(
     DEFAULT_CUSTOMIZABLE_STATE
   );
-  const [hasActiveLicense, setHasActiveLicense] = useState<boolean>(false);
+  // Keyfloe ships unlocked by default — the v0.1 SaaS plan is "all
+  // features work, billing toggled later". Default true so the user
+  // doesn't hit the Pluely-style license-gated drag/chat/settings on
+  // first launch.
+  const [hasActiveLicense, setHasActiveLicense] = useState<boolean>(true);
   const [supportsImages, setSupportsImagesState] = useState<boolean>(() => {
     const stored = safeLocalStorage.getItem(STORAGE_KEYS.SUPPORTS_IMAGES);
     return stored === null ? true : stored === "true";
@@ -149,10 +153,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const getActiveLicenseStatus = async () => {
-    const response: { is_active: boolean; is_dev_license: boolean } =
-      await invoke("validate_license_api");
-    setHasActiveLicense(response.is_active);
-
+    // No-op for Keyfloe: license is always active in v0.1. Original Pluely
+    // code path is left as a reference for when we wire real billing.
+    setHasActiveLicense(true);
+    const response: { is_active: boolean; is_dev_license: boolean } = {
+      is_active: true, is_dev_license: false,
+    };
     if (response?.is_dev_license) {
       setKeyfloeApiEnabled(false);
     }
