@@ -1,35 +1,37 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'node:path';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+import tailwindcss from "@tailwindcss/vite";
 
-// Renderer build (the React UI loaded into each BrowserWindow).
-// Each window points at its own HTML entry; Vite handles them as
-// multi-page builds so the dashboard, pill, and overlay each get
-// their own bundle and can be opened independently.
-export default defineConfig({
-  root: 'src/renderer',
-  base: './',
-  plugins: [react()],
+const host = process.env.TAURI_DEV_HOST;
+
+// https://vite.dev/config/
+export default defineConfig(async () => ({
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@shared': path.resolve(__dirname, 'src/shared'),
-      '@renderer': path.resolve(__dirname, 'src/renderer'),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
-  build: {
-    outDir: '../../dist/renderer',
-    emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        notch:     path.resolve(__dirname, 'src/renderer/notch.html'),
-        dashboard: path.resolve(__dirname, 'src/renderer/dashboard.html'),
-        pill:      path.resolve(__dirname, 'src/renderer/pill.html'),
-        overlay:   path.resolve(__dirname, 'src/renderer/overlay.html'),
-      },
-    },
-  },
+  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
+  //
+  // 1. prevent Vite from obscuring rust errors
+  clearScreen: false,
+  // 2. tauri expects a fixed port, fail if that port is not available
   server: {
-    port: 5173,
+    port: 1420,
     strictPort: true,
+    host: host || false,
+    hmr: host
+      ? {
+          protocol: "ws",
+          host,
+          port: 1421,
+        }
+      : undefined,
+    watch: {
+      // 3. tell Vite to ignore watching `src-tauri`
+      ignored: ["**/src-tauri/**"],
+    },
   },
-});
+}));

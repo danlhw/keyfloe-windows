@@ -1,100 +1,96 @@
 {
-  "name": "keyfloe-windows",
-  "productName": "Keyfloe",
-  "version": "0.1.5",
-  "description": "Keyfloe for Windows — native AI companion. Voice in, text out. Right-Ctrl opens a chat pill anchored to the cursor; hold Right-Ctrl to dictate; Interview mode for live call transcription + answer suggestions; Clicky cursor pointer mode for screen-grounded help.",
-  "author": "Onefloe",
-  "license": "UNLICENSED",
-  "main": "dist/main/index.js",
+  "name": "pluely",
+  "private": false,
+  "version": "0.1.9",
+  "description": "The Open Source Alternative to Cluely - A lightning-fast, privacy-first AI assistant that works seamlessly during meetings, interviews, and conversations without anyone knowing.",
+  "author": {
+    "name": "Srikanth Nani",
+    "email": "srikanthnani1202@gmail.com",
+    "url": "https://www.srikanthnani.com"
+  },
+  "license": "GPL-3.0",
+  "homepage": "https://github.com/iamsrikanthnani/pluely#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iamsrikanthnani/pluely.git"
+  },
+  "bugs": {
+    "url": "https://github.com/iamsrikanthnani/pluely/issues"
+  },
+  "keywords": [
+    "ai-assistant",
+    "tauri",
+    "desktop-app",
+    "privacy-first",
+    "open-source",
+    "meeting-assistant",
+    "speech-to-text",
+    "llm",
+    "chatgpt",
+    "claude",
+    "cluely-alternative",
+    "typescript",
+    "react",
+    "rust"
+  ],
+  "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n MAIN,REND \"npm:dev:main\" \"npm:dev:renderer\"",
-    "dev:main": "tsc -p tsconfig.main.json -w & vite build -c vite.main.config.ts --watch",
-    "dev:renderer": "vite",
-    "build:main": "tsc -p tsconfig.main.json && vite build -c vite.main.config.ts",
-    "build:preload": "vite build -c vite.preload.config.ts",
-    "build:renderer": "vite build",
-    "build": "npm run build:main && npm run build:preload && npm run build:renderer",
-    "start": "electron .",
-    "package": "npm run build && electron-builder --win --x64",
-    "lint": "eslint src --ext .ts,.tsx --max-warnings 0",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.40.0",
-    "@types/marked": "^5.0.2",
-    "electron-store": "^8.2.0",
-    "marked": "^18.0.4",
-    "node-fetch": "^3.3.2",
-    "uiohook-napi": "^1.5.4",
-    "uuid": "^11.0.3",
-    "wav-decoder": "^1.3.0",
-    "wav-encoder": "^1.3.0"
+    "@bany/curl-to-json": "^1.2.8",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-popover": "^1.1.15",
+    "@radix-ui/react-scroll-area": "^1.2.10",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-slider": "^1.3.6",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-switch": "^1.2.6",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@ricky0123/vad-react": "^0.0.30",
+    "@tailwindcss/vite": "^4.1.12",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-autostart": "^2.5.0",
+    "@tauri-apps/plugin-global-shortcut": "^2.3.0",
+    "@tauri-apps/plugin-http": "^2.5.2",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2.3.0",
+    "@tauri-apps/plugin-sql": "^2.3.0",
+    "@tauri-apps/plugin-updater": "^2.9.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "lucide-react": "^0.539.0",
+    "moment": "^2.30.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-error-boundary": "^6.0.0",
+    "react-router-dom": "^7.9.5",
+    "recharts": "^2.15.4",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "shiki": "^3.12.2",
+    "streamdown": "^1.6.10",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss": "^4.1.12",
+    "tauri-plugin-keychain": "^2.0.1",
+    "tauri-plugin-macos-permissions-api": "^2.3.0",
+    "tauri-plugin-posthog-api": "^0.2.2"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "@types/uuid": "^10.0.0",
-    "@vitejs/plugin-react": "^4.3.4",
-    "autoprefixer": "^10.4.20",
-    "concurrently": "^9.1.0",
-    "electron": "^33.2.1",
-    "electron-builder": "^25.1.8",
-    "postcss": "^8.4.49",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "tailwindcss": "^3.4.15",
-    "typescript": "^5.7.2",
-    "vite": "^6.0.3",
-    "vite-plugin-electron": "^0.29.0",
-    "vite-plugin-electron-renderer": "^0.14.6"
-  },
-  "build": {
-    "appId": "com.onefloe.keyfloe",
-    "productName": "Keyfloe",
-    "copyright": "Copyright © 2026 Onefloe",
-    "npmRebuild": false,
-    "buildDependenciesFromSource": false,
-    "nodeGypRebuild": false,
-    "directories": {
-      "output": "release",
-      "buildResources": "build"
-    },
-    "files": [
-      "dist/**/*",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "resources/whisper-models",
-        "to": "whisper-models",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "build/icon.ico",
-      "legalTrademarks": "Keyfloe™ Onefloe",
-      "signtoolOptions": {
-        "publisherName": "Onefloe"
-      }
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Keyfloe"
-    }
+    "@tauri-apps/cli": "^2",
+    "@types/node": "^24.3.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "tw-animate-css": "^1.3.6",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
   }
 }
