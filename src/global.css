@@ -5,7 +5,24 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── Keyfloe brand fonts (match the Mac app exactly) ───────────────── */
+@font-face { font-family: 'Geist'; src: url('/fonts/Geist-Variable.ttf') format('truetype'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'Fraunces'; src: url('/fonts/Fraunces.ttf') format('truetype'); font-weight: 300 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Fraunces'; src: url('/fonts/Fraunces-Italic.ttf') format('truetype'); font-weight: 300 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Departure Mono'; src: url('/fonts/DepartureMono-Regular.otf') format('opentype'); font-display: swap; }
+
 @theme inline {
+  /* brand fonts surfaced as Tailwind font-sans / font-serif / font-mono */
+  --font-sans: 'Geist', -apple-system, system-ui, sans-serif;
+  --font-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-mono: 'Departure Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* brand accent colors surfaced as text-kf-gold / bg-kf-blue / etc. */
+  --color-kf-paper: var(--kf-paper);
+  --color-kf-gold: var(--kf-gold);
+  --color-kf-blue: var(--kf-blue);
+  --color-kf-green: var(--kf-green);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -43,74 +60,56 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-:root {
-  --radius: 0.625rem;
-  --cursor-type: default;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
+/* Keyfloe brand palette — dark-first "warm paper on deep ink", applied to
+   BOTH :root and .dark so the app is always on-brand regardless of OS theme.
+   Semantic shadcn vars are mapped to brand tones so every existing component
+   inherits the look without touching component code. */
+:root,
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --radius: 0.875rem;
+  --cursor-type: default;
+
+  /* raw brand tokens */
+  --kf-paper: #f5f1ea;
+  --kf-ink: #0b0b0d;
+  --kf-gold: #d69646;
+  --kf-blue: #6070ff;
+  --kf-green: #3ad17a;
+  --kf-glass-grad: linear-gradient(160deg, rgba(245, 241, 234, 0.09), rgba(245, 241, 234, 0.035));
+  --kf-glass-border: rgba(245, 241, 234, 0.14);
+
+  /* shadcn semantic vars → brand */
+  --background: #0b0b0d;
+  --foreground: #f5f1ea;
+  --card: #141417;
+  --card-foreground: #f5f1ea;
+  --popover: #161619;
+  --popover-foreground: #f5f1ea;
+  --primary: #f5f1ea;
+  --primary-foreground: #0b0b0d;
+  --secondary: #1c1c20;
+  --secondary-foreground: #f5f1ea;
+  --muted: #1c1c20;
+  --muted-foreground: #9a948b;
+  --accent: #232328;
+  --accent-foreground: #f5f1ea;
+  --destructive: #e5484d;
+  --border: rgba(245, 241, 234, 0.10);
+  --input: rgba(245, 241, 234, 0.14);
+  --ring: #d69646;
+  --chart-1: #d69646;
+  --chart-2: #6070ff;
+  --chart-3: #3ad17a;
+  --chart-4: #e0b15f;
+  --chart-5: #8b93ff;
+  --sidebar: #0e0e11;
+  --sidebar-foreground: #f5f1ea;
+  --sidebar-primary: #d69646;
+  --sidebar-primary-foreground: #0b0b0d;
+  --sidebar-accent: #1c1c20;
+  --sidebar-accent-foreground: #f5f1ea;
+  --sidebar-border: rgba(245, 241, 234, 0.08);
+  --sidebar-ring: #d69646;
 }
 
 @layer base {
@@ -118,22 +117,39 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 }
 
-/* Apply global transparency */
-[data-slot="card"] {
-  background-color: rgb(from var(--card) r g b / var(--opacity, 1)) !important;
-  backdrop-filter: var(--backdrop-blur, none);
+/* ── Liquid glass: every shadcn Card/Popover becomes a frosted brand panel.
+   The pill itself is a Card, so this glasses the pill AND dashboard cards. */
+[data-slot="card"],
+[data-slot="popover-content"] {
+  background: var(--kf-glass-grad) !important;
+  backdrop-filter: blur(40px) saturate(1.4);
+  -webkit-backdrop-filter: blur(40px) saturate(1.4);
+  border: 1px solid var(--kf-glass-border) !important;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.18),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+    0 24px 60px rgba(0, 0, 0, 0.45);
 }
 
-[data-slot="popover-content"] {
-  background-color: rgb(
-    from var(--popover) r g b / var(--opacity, 1)
-  ) !important;
-  backdrop-filter: var(--backdrop-blur, none);
+/* Dark aurora background for full-window surfaces (dashboard). Applied via
+   the .kf-app-bg class so the transparent pill window is never filled. */
+.kf-app-bg {
+  background-color: #0b0b0d;
+  background-image:
+    radial-gradient(120% 90% at 8% 0%, rgba(214, 150, 70, 0.10), transparent 55%),
+    radial-gradient(120% 90% at 100% 100%, rgba(96, 112, 255, 0.12), transparent 55%);
 }
+
+/* Brand type helpers (match the Mac eyebrow / display-italic treatments). */
+.kf-display { font-family: var(--font-serif); font-style: italic; letter-spacing: -0.02em; }
+.kf-eyebrow { font-family: var(--font-mono); letter-spacing: 0.3em; text-transform: uppercase; }
 
 * {
   scrollbar-width: thin;
