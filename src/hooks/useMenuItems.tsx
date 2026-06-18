@@ -9,7 +9,6 @@ import {
   HomeIcon,
   PowerIcon,
   MailIcon,
-  CoffeeIcon,
   GlobeIcon,
   BugIcon,
   MessageSquareTextIcon,
@@ -113,11 +112,6 @@ export const useMenuItems = () => {
       title: "Github",
       icon: GithubIcon,
       link: "https://github.com/danlhw/keyfloe-windows",
-    },
-    {
-      title: "Buy Me a Coffee",
-      icon: CoffeeIcon,
-      link: "https://buymeacoffee.com/onefloe",
     },
     {
       title: "Follow on X",
