@@ -29,6 +29,22 @@ fn get_app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+/// Auto-paste dictation: type the given text into whatever field currently has
+/// OS focus (the app the user was in before triggering Keyfloe). Uses enigo,
+/// which is SendInput on Windows / CGEvent on macOS — same code both platforms.
+/// This is the core thing the Mac app does after a dictation that the Windows
+/// app was missing.
+#[tauri::command]
+fn type_text(text: String) -> Result<(), String> {
+    use enigo::{Enigo, Keyboard, Settings};
+    if text.is_empty() {
+        return Ok(());
+    }
+    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
+    enigo.text(&text).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Get PostHog API key
@@ -73,6 +89,7 @@ pub fn run() {
     let mut builder = builder
         .invoke_handler(tauri::generate_handler![
             get_app_version,
+            type_text,
             window::set_window_height,
             window::open_dashboard,
             window::toggle_dashboard,
