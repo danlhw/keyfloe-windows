@@ -1,25 +1,32 @@
-import * as React from "react";
+import React from "react";
 
-import { cn } from "@/lib/utils";
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  variant?: "default" | "compact";
+}
 
-function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+export const Input: React.FC<InputProps> = ({
+  className = "",
+  variant = "default",
+  disabled,
+  ...props
+}) => {
+  const baseClasses =
+    "px-2 py-1 text-sm font-semibold bg-mid-gray/10 border border-mid-gray/80 rounded-md text-start transition-all duration-150";
+
+  const interactiveClasses = disabled
+    ? "opacity-60 cursor-not-allowed bg-mid-gray/10 border-mid-gray/40"
+    : "hover:bg-logo-primary/10 hover:border-logo-primary focus:outline-none focus:bg-logo-primary/20 focus:border-logo-primary";
+
+  const variantClasses = {
+    default: "px-3 py-2",
+    compact: "px-2 py-1",
+  } as const;
+
   return (
     <input
-      type={type}
-      data-slot="input"
-      className={cn(
-        "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-primary/50 dark:border-input/80 flex h-9 w-full min-w-0 rounded-xl border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-        "focus-visible:border-ring/60 focus-visible:ring-ring dark:focus-visible:ring-ring/60 focus-visible:ring-[2px]",
-        "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
-        className
-      )}
-      autoComplete="off"
-      autoCorrect="off"
-      autoCapitalize="off"
-      spellCheck={false}
+      className={`${baseClasses} ${variantClasses[variant]} ${interactiveClasses} ${className}`}
+      disabled={disabled}
       {...props}
     />
   );
-}
-
-export { Input };
+};

@@ -1,22 +1,27 @@
-import * as React from "react";
+import React from "react";
 
-import { cn } from "@/lib/utils";
+interface TextareaProps
+  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  variant?: "default" | "compact";
+}
 
-function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
+export const Textarea: React.FC<TextareaProps> = ({
+  className = "",
+  variant = "default",
+  ...props
+}) => {
+  const baseClasses =
+    "px-2 py-1 text-sm font-semibold bg-mid-gray/10 border border-mid-gray/80 rounded-md text-start transition-[background-color,border-color] duration-150 hover:bg-logo-primary/10 hover:border-logo-primary focus:outline-none focus:bg-logo-primary/10 focus:border-logo-primary resize-y";
+
+  const variantClasses = {
+    default: "px-3 py-2 min-h-[100px]",
+    compact: "px-2 py-1 min-h-[80px]",
+  };
+
   return (
     <textarea
-      data-slot="textarea"
-      className={cn(
-        "border-input/80 placeholder:text-muted-foreground focus-visible:border-ring/80 focus-visible:ring-ring/10 focus-visible:ring-[2px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 flex field-sizing-content min-h-16 w-full rounded-xl border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-        className
-      )}
-      autoComplete="off"
-      autoCorrect="off"
-      autoCapitalize="off"
-      spellCheck={false}
+      className={`${baseClasses} ${variantClasses[variant]} ${className}`}
       {...props}
     />
   );
-}
-
-export { Textarea };
+};

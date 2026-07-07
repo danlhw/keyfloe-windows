@@ -1,116 +1,78 @@
-import { useEffect, useState } from "react";
-import { useApp } from "@/contexts";
-import {
-  extractVariables,
-  safeLocalStorage,
-  deleteAllConversations,
-} from "@/lib";
-import { STORAGE_KEYS } from "@/config";
+import { useEffect } from "react";
+import { useSettingsStore } from "../stores/settingsStore";
+import type { AppSettings as Settings, AudioDevice } from "@/bindings";
 
-export const useSettings = () => {
-  const {
-    screenshotConfiguration,
-    setScreenshotConfiguration,
-    allAiProviders,
-    allSttProviders,
-    selectedAIProvider,
-    selectedSttProvider,
-    onSetSelectedAIProvider,
-    onSetSelectedSttProvider,
-    hasActiveLicense,
-  } = useApp();
-  const [variables, setVariables] = useState<{ key: string; value: string }[]>(
-    []
-  );
-  const [sttVariables, setSttVariables] = useState<
-    {
-      key: string;
-      value: string;
-    }[]
-  >([]);
+interface UseSettingsReturn {
+  // State
+  settings: Settings | null;
+  isLoading: boolean;
+  isUpdating: (key: string) => boolean;
+  audioDevices: AudioDevice[];
+  outputDevices: AudioDevice[];
+  audioFeedbackEnabled: boolean;
+  postProcessModelOptions: Record<string, string[]>;
 
-  const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
+  // Actions
+  updateSetting: <K extends keyof Settings>(
+    key: K,
+    value: Settings[K],
+  ) => Promise<void>;
+  resetSetting: (key: keyof Settings) => Promise<void>;
+  refreshSettings: () => Promise<void>;
+  refreshAudioDevices: () => Promise<void>;
+  refreshOutputDevices: () => Promise<void>;
 
-  const handleScreenshotModeChange = (value: "auto" | "manual") => {
-    const newConfig = { ...screenshotConfiguration, mode: value };
-    setScreenshotConfiguration(newConfig);
-    safeLocalStorage.setItem(
-      STORAGE_KEYS.SCREENSHOT_CONFIG,
-      JSON.stringify(newConfig)
-    );
-  };
+  // Binding-specific actions
+  updateBinding: (id: string, binding: string) => Promise<void>;
+  resetBinding: (id: string) => Promise<void>;
 
-  const handleScreenshotPromptChange = (value: string) => {
-    const newConfig = { ...screenshotConfiguration, autoPrompt: value };
-    setScreenshotConfiguration(newConfig);
-    safeLocalStorage.setItem(
-      STORAGE_KEYS.SCREENSHOT_CONFIG,
-      JSON.stringify(newConfig)
-    );
-  };
+  // Convenience getters
+  getSetting: <K extends keyof Settings>(key: K) => Settings[K] | undefined;
 
-  const handleScreenshotEnabledChange = (enabled: boolean) => {
-    if (!enabled && !hasActiveLicense) {
-      return;
-    }
-    const newConfig = { ...screenshotConfiguration, enabled };
-    setScreenshotConfiguration(newConfig);
-    safeLocalStorage.setItem(
-      STORAGE_KEYS.SCREENSHOT_CONFIG,
-      JSON.stringify(newConfig)
-    );
-  };
+  // Post-processing helpers
+  setPostProcessProvider: (providerId: string) => Promise<void>;
+  updatePostProcessBaseUrl: (
+    providerId: string,
+    baseUrl: string,
+  ) => Promise<void>;
+  updatePostProcessApiKey: (
+    providerId: string,
+    apiKey: string,
+  ) => Promise<void>;
+  updatePostProcessModel: (providerId: string, model: string) => Promise<void>;
+  fetchPostProcessModels: (providerId: string) => Promise<string[]>;
+}
 
+export const useSettings = (): UseSettingsReturn => {
+  const store = useSettingsStore();
+
+  // Initialize on first mount
   useEffect(() => {
-    if (selectedAIProvider.provider) {
-      const provider = allAiProviders.find(
-        (p) => p.id === selectedAIProvider.provider
-      );
-      if (provider) {
-        const variables = extractVariables(provider?.curl);
-        setVariables(variables);
-      }
+    if (store.isLoading) {
+      store.initialize();
     }
-  }, [selectedAIProvider.provider]);
-
-  useEffect(() => {
-    if (selectedSttProvider.provider) {
-      const provider = allSttProviders.find(
-        (p) => p.id === selectedSttProvider.provider
-      );
-      if (provider) {
-        const variables = extractVariables(provider?.curl);
-        setSttVariables(variables);
-      }
-    }
-  }, [selectedSttProvider.provider]);
-
-  const handleDeleteAllChatsConfirm = async () => {
-    try {
-      await deleteAllConversations();
-      setShowDeleteConfirmDialog(false);
-    } catch (error) {
-      console.error("Failed to delete all conversations:", error);
-    }
-  };
+  }, [store.initialize, store.isLoading]);
 
   return {
-    screenshotConfiguration,
-    setScreenshotConfiguration,
-    handleScreenshotModeChange,
-    handleScreenshotPromptChange,
-    handleScreenshotEnabledChange,
-    allAiProviders,
-    allSttProviders,
-    selectedAIProvider,
-    selectedSttProvider,
-    onSetSelectedAIProvider,
-    onSetSelectedSttProvider,
-    handleDeleteAllChatsConfirm,
-    showDeleteConfirmDialog,
-    setShowDeleteConfirmDialog,
-    variables,
-    sttVariables,
-    hasActiveLicense,
+    settings: store.settings,
+    isLoading: store.isLoading,
+    isUpdating: store.isUpdatingKey,
+    audioDevices: store.audioDevices,
+    outputDevices: store.outputDevices,
+    audioFeedbackEnabled: store.settings?.audio_feedback || false,
+    postProcessModelOptions: store.postProcessModelOptions,
+    updateSetting: store.updateSetting,
+    resetSetting: store.resetSetting,
+    refreshSettings: store.refreshSettings,
+    refreshAudioDevices: store.refreshAudioDevices,
+    refreshOutputDevices: store.refreshOutputDevices,
+    updateBinding: store.updateBinding,
+    resetBinding: store.resetBinding,
+    getSetting: store.getSetting,
+    setPostProcessProvider: store.setPostProcessProvider,
+    updatePostProcessBaseUrl: store.updatePostProcessBaseUrl,
+    updatePostProcessApiKey: store.updatePostProcessApiKey,
+    updatePostProcessModel: store.updatePostProcessModel,
+    fetchPostProcessModels: store.fetchPostProcessModels,
   };
 };

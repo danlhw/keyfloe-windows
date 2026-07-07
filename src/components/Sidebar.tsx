@@ -1,95 +1,126 @@
-import { SparklesIcon } from "lucide-react";
-import { Button } from "@/components";
-import { cn } from "@/lib/utils";
-import { useLocation, useNavigate } from "react-router-dom";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { useMenuItems, useVersion } from "@/hooks";
+import React from "react";
+import { useTranslation } from "react-i18next";
+import { Cog, FlaskConical, History, Info, Sparkles, Cpu } from "lucide-react";
+import HandyTextLogo from "./icons/HandyTextLogo";
+import HandyHand from "./icons/HandyHand";
+import { useSettings } from "../hooks/useSettings";
+import {
+  GeneralSettings,
+  AdvancedSettings,
+  HistorySettings,
+  DebugSettings,
+  AboutSettings,
+  PostProcessingSettings,
+  ModelsSettings,
+} from "./settings";
 
-export const Sidebar = () => {
-  const { version, isLoading } = useVersion();
-  const { menu, footerLinks, footerItems } = useMenuItems();
+export type SidebarSection = keyof typeof SECTIONS_CONFIG;
 
-  const navigate = useNavigate();
-  const activeRoute = useLocation().pathname;
+interface IconProps {
+  width?: number | string;
+  height?: number | string;
+  size?: number | string;
+  className?: string;
+  [key: string]: any;
+}
+
+interface SectionConfig {
+  labelKey: string;
+  icon: React.ComponentType<IconProps>;
+  component: React.ComponentType;
+  enabled: (settings: any) => boolean;
+}
+
+export const SECTIONS_CONFIG = {
+  general: {
+    labelKey: "sidebar.general",
+    icon: HandyHand,
+    component: GeneralSettings,
+    enabled: () => true,
+  },
+  models: {
+    labelKey: "sidebar.models",
+    icon: Cpu,
+    component: ModelsSettings,
+    enabled: () => true,
+  },
+  advanced: {
+    labelKey: "sidebar.advanced",
+    icon: Cog,
+    component: AdvancedSettings,
+    enabled: () => true,
+  },
+  history: {
+    labelKey: "sidebar.history",
+    icon: History,
+    component: HistorySettings,
+    enabled: () => true,
+  },
+  postprocessing: {
+    labelKey: "sidebar.postProcessing",
+    icon: Sparkles,
+    component: PostProcessingSettings,
+    enabled: (settings) => settings?.post_process_enabled ?? false,
+  },
+  debug: {
+    labelKey: "sidebar.debug",
+    icon: FlaskConical,
+    component: DebugSettings,
+    enabled: (settings) => settings?.debug_mode ?? false,
+  },
+  about: {
+    labelKey: "sidebar.about",
+    icon: Info,
+    component: AboutSettings,
+    enabled: () => true,
+  },
+} as const satisfies Record<string, SectionConfig>;
+
+interface SidebarProps {
+  activeSection: SidebarSection;
+  onSectionChange: (section: SidebarSection) => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({
+  activeSection,
+  onSectionChange,
+}) => {
+  const { t } = useTranslation();
+  const { settings } = useSettings();
+
+  const availableSections = Object.entries(SECTIONS_CONFIG)
+    .filter(([_, config]) => config.enabled(settings))
+    .map(([id, config]) => ({ id: id as SidebarSection, ...config }));
+
   return (
-    <aside className="flex w-56 flex-col select-none pt-2">
-      {/* Logo */}
-      <div
-        onClick={() => navigate("/dashboard")}
-        className="flex h-16 items-center px-4 pt-10 gap-1.5"
-      >
-        <div className="flex size-6 lg:size-7 items-center justify-center rounded-lg bg-primary">
-          <SparklesIcon className="size-4 lg:size-5 text-primary-foreground transition-all duration-300" />
-        </div>
-        <div className="flex flex-col">
-          <h1 className="text-xs lg:text-md font-semibold text-foreground transition-all duration-300">
-            Keyfloe
-          </h1>
-          <span className="text-[8px] lg:text-[10px] text-muted-foreground -mt-1 block">
-            {isLoading ? "Loading..." : `(v${version})`}
-          </span>
-        </div>
-      </div>
+    <div className="flex flex-col w-40 h-full border-e border-mid-gray/20 items-center px-2">
+      <HandyTextLogo width={120} className="m-4" />
+      <div className="flex flex-col w-full items-center gap-1 pt-2 border-t border-mid-gray/20">
+        {availableSections.map((section) => {
+          const Icon = section.icon;
+          const isActive = activeSection === section.id;
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-6">
-        {menu.map((item, index) => (
-          <button
-            onClick={() => navigate(item.href)}
-            key={`${item.label}-${index}`}
-            className={cn(
-              "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-[11px] uppercase tracking-[0.14em] text-sidebar-foreground/55 transition-all duration-300 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-              activeRoute.includes(item.href)
-                ? "font-medium bg-sidebar-accent text-kf-gold"
-                : ""
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <item.icon className="size-3 lg:size-4 transition-all duration-300" />
-              {item.label}
-            </div>
-            {item.count ? (
-              <span className="flex size-5 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">
-                {item.count}
-              </span>
-            ) : null}
-          </button>
-        ))}
-      </nav>
-
-      <div className="flex flex-col space-y-1 px-3  pb-3">
-        <div className="flex flex-row justify-evenly items-center gap-2 mb-3">
-          {footerLinks.map((item, index) => (
-            <Button
-              key={`${item.title}-${index}`}
-              title={item.title}
-              size="sm"
-              variant="outline"
-              onClick={() => openUrl(item.link)}
+          return (
+            <div
+              key={section.id}
+              className={`flex gap-2 items-center p-2 w-full rounded-lg cursor-pointer transition-colors ${
+                isActive
+                  ? "bg-logo-primary/80"
+                  : "hover:bg-mid-gray/20 hover:opacity-100 opacity-85"
+              }`}
+              onClick={() => onSectionChange(section.id)}
             >
-              <item.icon className="size-3 lg:size-4 transition-all duration-300" />
-            </Button>
-          ))}
-        </div>
-
-        {footerItems.map((item, index) => (
-          <a
-            href={item.href}
-            onClick={item.action}
-            target="_blank"
-            rel="noopener noreferrer"
-            key={`${item.label}-${index}`}
-            className={cn(
-              "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs lg:text-sm text-sidebar-foreground/70 transition-all duration-300 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <item.icon className="size-3 lg:size-4 transition-all duration-300" />
-              {item.label}
+              <Icon width={24} height={24} className="shrink-0" />
+              <p
+                className="text-sm font-medium truncate"
+                title={t(section.labelKey)}
+              >
+                {t(section.labelKey)}
+              </p>
             </div>
-          </a>
-        ))}
+          );
+        })}
       </div>
-    </aside>
+    </div>
   );
 };
