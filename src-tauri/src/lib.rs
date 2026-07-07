@@ -9,6 +9,7 @@ mod clipboard;
 mod commands;
 mod helpers;
 mod input;
+mod keyfloe;
 mod llm_client;
 mod managers;
 mod overlay;
@@ -180,6 +181,12 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(model_manager.clone());
     app_handle.manage(transcription_manager.clone());
     app_handle.manage(history_manager.clone());
+
+    // Keyfloe: interview session singleton + the tap/hold key-remap engine.
+    // keybinding::init loads keybindings.json, spawns the engine thread, and
+    // installs the native WH_KEYBOARD_LL hook (a no-op off Windows).
+    app_handle.manage(keyfloe::interview::InterviewState::default());
+    keyfloe::keybinding::init(app_handle);
 
     // Note: Shortcuts are NOT initialized here.
     // The frontend is responsible for calling the `initialize_shortcuts` command
@@ -637,6 +644,48 @@ pub fn run(cli_args: CliArgs) {
             commands::history::update_history_limit,
             commands::history::update_recording_retention_period,
             helpers::clamshell::is_laptop,
+            // ── Keyfloe features ──────────────────────────────────────────
+            // Dictation parity (B)
+            keyfloe::dictation::commands::keyfloe_get_dictation_settings,
+            keyfloe::dictation::commands::keyfloe_set_dictation_settings,
+            keyfloe::dictation::commands::keyfloe_get_vocabulary,
+            keyfloe::dictation::commands::keyfloe_add_vocabulary,
+            keyfloe::dictation::commands::keyfloe_remove_vocabulary,
+            keyfloe::dictation::commands::keyfloe_clear_vocabulary,
+            keyfloe::dictation::commands::keyfloe_get_dictation_stats,
+            keyfloe::dictation::commands::keyfloe_get_dictation_log,
+            keyfloe::dictation::commands::keyfloe_delete_dictation_log_entry,
+            keyfloe::dictation::commands::keyfloe_clear_dictation_log,
+            // Floe voice agent (C) — full path so the specta helper items
+            // (generated next to the fn) resolve; the mod's `pub use` re-exports
+            // the fn but not its `__cmd__`/`__specta__fn__` siblings.
+            keyfloe::agent::commands::run_agent_command,
+            keyfloe::agent::commands::run_agent_voice_command,
+            // Interview mode (D)
+            keyfloe::interview::interview_start,
+            keyfloe::interview::interview_stop,
+            keyfloe::interview::interview_toggle,
+            keyfloe::interview::interview_is_running,
+            keyfloe::interview::interview_ask_answer,
+            keyfloe::interview::interview_ensure_overlay,
+            keyfloe::interview::interview_set_overlay_visible,
+            keyfloe::interview::interview_get_context,
+            keyfloe::interview::interview_save_context,
+            // AI Snapshot (E)
+            keyfloe::snapshot::snapshot_begin,
+            keyfloe::snapshot::snapshot_cancel,
+            keyfloe::snapshot::snapshot_capture_region,
+            // Key remapping / tap-hold (F)
+            keyfloe::keybinding::keybinding_get_config,
+            keyfloe::keybinding::keybinding_get_meta,
+            keyfloe::keybinding::keybinding_assign,
+            keyfloe::keybinding::keybinding_clear,
+            keyfloe::keybinding::keybinding_reset_key,
+            keyfloe::keybinding::keybinding_reset_all,
+            keyfloe::keybinding::keybinding_save_custom_feature,
+            keyfloe::keybinding::keybinding_delete_custom_feature,
+            keyfloe::keybinding::keybinding_start_capture,
+            keyfloe::keybinding::keybinding_stop_capture,
         ])
         .events(collect_events![
             managers::history::HistoryUpdatePayload,

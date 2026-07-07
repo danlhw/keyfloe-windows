@@ -5,7 +5,7 @@ description = "Keyfloe — your keyboard, supercharged"
 authors = ["cjpais"]
 edition = "2021"
 license = "MIT"
-default-run = "handy"
+default-run = "keyfloe"
 
 [profile.dev]
 incremental = true # Compile your binary in smaller steps.
@@ -58,7 +58,11 @@ tokio = "1.43.0"
 vad-rs = { git = "https://github.com/cjpais/vad-rs", default-features = false }
 enigo = "0.6.1"
 rodio = { git = "https://github.com/cjpais/rodio.git" }
-reqwest = { version = "0.12", features = ["json", "stream"] }
+reqwest = { version = "0.12", features = ["json", "stream", "multipart"] }
+# Keyfloe: AI Snapshot region capture + image encode (all cross-platform).
+xcap = "0.9"
+image = "0.25"
+base64 = "0.22"
 futures-util = "0.3"
 rustfft = "6.4.0"
 strsim = "0.11.0"
@@ -105,10 +109,21 @@ tauri-plugin-updater = "2.10.0"
 # is inherited here, so Parakeet/Moonshine/etc. still run on CPU.
 windows = { version = "0.61.3", features = [
   "Win32_Media_Audio_Endpoints",
+  "Win32_System_Com",
   "Win32_System_Com_StructuredStorage",
   "Win32_System_Variant",
   "Win32_Foundation",
   "Win32_UI_WindowsAndMessaging",
+  # Keyfloe: dictation focus save/restore + interview exclude-from-capture use
+  # the above; the correction-learner UIA field read uses Accessibility.
+  "Win32_UI_Accessibility",
+  "Win32_Graphics_Gdi",
+] }
+# Keyfloe: the tap/hold key-remap engine's WH_KEYBOARD_LL hook (hook.rs).
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_UI_Input_KeyboardAndMouse",
 ] }
 winreg = "0.55"
 
