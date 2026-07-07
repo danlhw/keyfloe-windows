@@ -1,0 +1,193 @@
+/* Pre-interview setup panel. Neutral, theme-agnostic — inherits the dashboard's
+   surface tokens where possible, with sane fallbacks. */
+
+.kf-ivc {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+  padding: 20px;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+.kf-ivc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.kf-ivc-head h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+.kf-ivc-start {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: #0a84ff;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.kf-ivc-start:hover {
+  filter: brightness(1.08);
+}
+.kf-ivc-sub {
+  margin: -6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.7;
+}
+
+.kf-ivc-card {
+  border: 0.5px solid rgba(128, 128, 128, 0.3);
+  border-radius: 12px;
+  padding: 16px;
+  background: rgba(128, 128, 128, 0.05);
+}
+.kf-ivc-card h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.kf-ivc-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.kf-ivc-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.6;
+}
+.kf-ivc-textarea,
+.kf-ivc-adddoc textarea,
+.kf-ivc-labeled textarea,
+.kf-ivc-adddoc input,
+.kf-ivc-name {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 13px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 0.5px solid rgba(128, 128, 128, 0.35);
+  background: rgba(128, 128, 128, 0.08);
+  color: inherit;
+  resize: vertical;
+}
+
+.kf-ivc-add,
+.kf-ivc-row-actions button,
+.kf-ivc-adddoc > button,
+.kf-ivc-modal-actions button {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 0.5px solid rgba(128, 128, 128, 0.35);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.kf-ivc-add:hover,
+.kf-ivc-row-actions button:hover {
+  background: rgba(128, 128, 128, 0.14);
+}
+
+.kf-ivc-empty {
+  font-size: 12px;
+  opacity: 0.5;
+  padding: 6px 0;
+}
+.kf-ivc-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.kf-ivc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(128, 128, 128, 0.06);
+}
+.kf-ivc-active {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.kf-ivc-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.kf-ivc-adddoc {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.kf-ivc-adddoc > button {
+  align-self: flex-start;
+}
+
+/* Profile editor modal ---------------------------------------------- */
+.kf-ivc-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.kf-ivc-modal-body {
+  width: min(560px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border-radius: 14px;
+  background: var(--kf-surface, #1c1c1e);
+  color: var(--kf-text, #f2f2f5);
+}
+@media (prefers-color-scheme: light) {
+  .kf-ivc-modal-body {
+    background: var(--kf-surface, #ffffff);
+    color: var(--kf-text, #1c1c1e);
+  }
+}
+.kf-ivc-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+.kf-ivc-labeled {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.kf-ivc-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+.kf-ivc-primary {
+  color: #fff;
+  background: #0a84ff;
+  border-color: transparent;
+}

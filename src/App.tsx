@@ -3,60 +3,43 @@ import { toast, Toaster } from "sonner";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { platform } from "@tauri-apps/plugin-os";
-import {
-  checkAccessibilityPermission,
-  checkMicrophonePermission,
-} from "tauri-plugin-macos-permissions-api";
 import { ModelStateEvent, RecordingErrorEvent } from "./lib/types/events";
 import "./App.css";
-import AccessibilityPermissions from "./components/AccessibilityPermissions";
-import Footer from "./components/footer";
-import Onboarding, { AccessibilityOnboarding } from "./components/onboarding";
-import { Sidebar, SidebarSection, SECTIONS_CONFIG } from "./components/Sidebar";
-import { WhatsNewGate } from "./components/whats-new";
-import { useSettings } from "./hooks/useSettings";
-import { useSettingsStore } from "./stores/settingsStore";
+// Keyfloe brand + shell. The design system CSS must load once, here.
+import "./keyfloe/shell/keyfloe.css";
+import {
+  KeyfloeOnboarding,
+  KeyfloeDashboard,
+  type DashboardTab,
+} from "./keyfloe/shell";
+import { KeybindingPanel } from "./keyfloe/keybinding";
+import { DictationPanel, DictationHistory } from "./keyfloe/dictation";
+import { InterviewContextPanel } from "./keyfloe/interview";
 import { commands } from "@/bindings";
+import { useSettingsStore } from "./stores/settingsStore";
 import { getLanguageDirection, initializeRTL } from "@/lib/utils/rtl";
 
-type OnboardingStep = "accessibility" | "model" | "done";
-
-const renderSettingsContent = (section: SidebarSection) => {
-  const ActiveComponent =
-    SECTIONS_CONFIG[section]?.component || SECTIONS_CONFIG.general.component;
-  return <ActiveComponent />;
-};
+type OnboardingStep = "onboarding" | "done";
 
 function App() {
   const { t, i18n } = useTranslation();
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep | null>(
     null,
   );
-  // Track if this is a returning user who just needs to grant permissions
-  // (vs a new user who needs full onboarding including model selection)
-  const [isReturningUser, setIsReturningUser] = useState(false);
-  const [currentSection, setCurrentSection] =
-    useState<SidebarSection>("general");
-  const { settings, updateSetting } = useSettings();
+  const [tab, setTab] = useState<DashboardTab>("home");
   const direction = getLanguageDirection(i18n.language);
-  const refreshAudioDevices = useSettingsStore(
-    (state) => state.refreshAudioDevices,
-  );
-  const refreshOutputDevices = useSettingsStore(
-    (state) => state.refreshOutputDevices,
-  );
+  const updateSetting = useSettingsStore((s) => s.updateSetting);
   const hasCompletedPostOnboardingInit = useRef(false);
 
   useEffect(() => {
     checkOnboardingStatus();
   }, []);
 
-  // Initialize RTL direction when language changes
   useEffect(() => {
     initializeRTL(i18n.language);
   }, [i18n.language]);
 
-  // Initialize Enigo, shortcuts, and refresh audio devices when main app loads
+  // Bring up the native input/shortcut layer once we reach the app proper.
   useEffect(() => {
     if (onboardingStep === "done" && !hasCompletedPostOnboardingInit.current) {
       hasCompletedPostOnboardingInit.current = true;
@@ -64,50 +47,22 @@ function App() {
         commands.initializeEnigo(),
         commands.initializeShortcuts(),
       ]).catch((e) => {
-        console.warn("Failed to initialize:", e);
+        console.warn("Failed to initialize native layer:", e);
       });
-      refreshAudioDevices();
-      refreshOutputDevices();
     }
-  }, [onboardingStep, refreshAudioDevices, refreshOutputDevices]);
+  }, [onboardingStep]);
 
-  // Handle keyboard shortcuts for debug mode toggle
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Check for Ctrl+Shift+D (Windows/Linux) or Cmd+Shift+D (macOS)
-      const isDebugShortcut =
-        event.shiftKey &&
-        event.key.toLowerCase() === "d" &&
-        (event.ctrlKey || event.metaKey);
-
-      if (isDebugShortcut) {
-        event.preventDefault();
-        const currentDebugMode = settings?.debug_mode ?? false;
-        updateSetting("debug_mode", !currentDebugMode);
-      }
-    };
-
-    // Add event listener when component mounts
-    document.addEventListener("keydown", handleKeyDown);
-
-    // Cleanup event listener when component unmounts
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [settings?.debug_mode, updateSetting]);
-
-  // Listen for recording errors from the backend and show a toast
+  // Backend recording errors → user-friendly toast.
   useEffect(() => {
     const unlisten = listen<RecordingErrorEvent>("recording-error", (event) => {
       const { error_type, detail } = event.payload;
-
       if (error_type === "microphone_permission_denied") {
-        const currentPlatform = platform();
-        const platformKey = `errors.micPermissionDenied.${currentPlatform}`;
-        const description = t(platformKey, {
-          defaultValue: t("errors.micPermissionDenied.generic"),
+        const platformKey = `errors.micPermissionDenied.${platform()}`;
+        toast.error(t("errors.micPermissionDeniedTitle"), {
+          description: t(platformKey, {
+            defaultValue: t("errors.micPermissionDenied.generic"),
+          }),
         });
-        toast.error(t("errors.micPermissionDeniedTitle"), { description });
       } else if (error_type === "no_input_device") {
         toast.error(t("errors.noInputDeviceTitle"), {
           description: t("errors.noInputDevice"),
@@ -123,10 +78,6 @@ function App() {
     };
   }, [t]);
 
-  // Listen for paste failures and show a toast.
-  // The technical error detail is logged to handy.log on the Rust side
-  // (see actions.rs `error!("Failed to paste transcription: ...")`),
-  // so we show a localized, user-friendly message here instead of the raw error.
   useEffect(() => {
     const unlisten = listen("paste-error", () => {
       toast.error(t("errors.pasteFailedTitle"), {
@@ -138,8 +89,6 @@ function App() {
     };
   }, [t]);
 
-  // Listen for transcription failures and show a toast.
-  // The payload is the backend error message (also logged to handy.log).
   useEffect(() => {
     const unlisten = listen<string>("transcription-error", (event) => {
       toast.error(t("errors.transcriptionFailedTitle"), {
@@ -151,7 +100,6 @@ function App() {
     };
   }, [t]);
 
-  // Listen for model loading failures and show a toast
   useEffect(() => {
     const unlisten = listen<ModelStateEvent>("model-state-changed", (event) => {
       if (event.payload.event_type === "loading_failed") {
@@ -160,9 +108,7 @@ function App() {
             model:
               event.payload.model_name || t("errors.modelLoadFailedUnknown"),
           }),
-          {
-            description: event.payload.error,
-          },
+          { description: event.payload.error },
         );
       }
     });
@@ -171,133 +117,67 @@ function App() {
     };
   }, [t]);
 
-  const revealMainWindowForPermissions = async () => {
-    try {
-      await commands.showMainWindowCommand();
-    } catch (e) {
-      console.warn("Failed to show main window for permission onboarding:", e);
-    }
-  };
-
   const checkOnboardingStatus = async () => {
     try {
       const settingsResult = await commands.getAppSettings();
-      const hasCompletedOnboarding =
+      const done =
         settingsResult.status === "ok" &&
         settingsResult.data.onboarding_completed === true;
-      const currentPlatform = platform();
-
-      if (hasCompletedOnboarding) {
-        // Returning user - check if they need to grant permissions first
-        setIsReturningUser(true);
-
-        if (currentPlatform === "macos") {
-          try {
-            const [hasAccessibility, hasMicrophone] = await Promise.all([
-              checkAccessibilityPermission(),
-              checkMicrophonePermission(),
-            ]);
-            if (!hasAccessibility || !hasMicrophone) {
-              await revealMainWindowForPermissions();
-              setOnboardingStep("accessibility");
-              return;
-            }
-          } catch (e) {
-            console.warn("Failed to check macOS permissions:", e);
-            // If we can't check, proceed to main app and let them fix it there
-          }
-        }
-
-        if (currentPlatform === "windows") {
-          try {
-            const microphoneStatus =
-              await commands.getWindowsMicrophonePermissionStatus();
-            if (
-              microphoneStatus.supported &&
-              microphoneStatus.overall_access === "denied"
-            ) {
-              await revealMainWindowForPermissions();
-              setOnboardingStep("accessibility");
-              return;
-            }
-          } catch (e) {
-            console.warn("Failed to check Windows microphone permissions:", e);
-            // If we can't check, proceed to main app and let them fix it there
-          }
-        }
-
-        setOnboardingStep("done");
-      } else {
-        // New user - start full onboarding
-        setIsReturningUser(false);
-        setOnboardingStep("accessibility");
-      }
+      setOnboardingStep(done ? "done" : "onboarding");
     } catch (error) {
       console.error("Failed to check onboarding status:", error);
-      setOnboardingStep("accessibility");
+      setOnboardingStep("onboarding");
     }
   };
 
-  const handleAccessibilityComplete = () => {
-    // Returning users already have models, skip to main app
-    // New users need to select a model
-    setOnboardingStep(isReturningUser ? "done" : "model");
-  };
-
-  const handleModelSelected = () => {
-    // Transition to main app - user has started a download
+  const finishOnboarding = async () => {
+    // Persist so onboarding doesn't re-show. Handy has no standalone
+    // "onboarding complete" command (it flips the flag as a side-effect of
+    // model download), so we go through the settings store. The dedicated
+    // Rust persister for this key is wired in the backend-integration phase.
+    try {
+      await updateSetting("onboarding_completed", true);
+    } catch (e) {
+      console.warn("Failed to persist onboarding_completed:", e);
+    }
     setOnboardingStep("done");
   };
 
-  // Still checking onboarding status
-  if (onboardingStep === null) {
-    return null;
-  }
+  // Still resolving first-run state.
+  if (onboardingStep === null) return null;
 
-  if (onboardingStep === "accessibility") {
-    return <AccessibilityOnboarding onComplete={handleAccessibilityComplete} />;
-  }
-
-  if (onboardingStep === "model") {
-    return <Onboarding onModelSelected={handleModelSelected} />;
+  if (onboardingStep === "onboarding") {
+    return (
+      <div dir={direction} className="kf-root">
+        <KeyfloeOnboarding onFinish={finishOnboarding} />
+      </div>
+    );
   }
 
   return (
-    <div
-      dir={direction}
-      className="h-screen flex flex-col select-none cursor-default"
-    >
+    <div dir={direction} className="kf-root h-screen select-none cursor-default">
       <Toaster
         theme="system"
         toastOptions={{
           unstyled: true,
           classNames: {
             toast:
-              "bg-background border border-mid-gray/20 rounded-lg shadow-lg px-4 py-3 flex items-center gap-3 text-sm",
+              "kf-toast bg-background border border-mid-gray/20 rounded-lg shadow-lg px-4 py-3 flex items-center gap-3 text-sm",
             title: "font-medium",
             description: "text-mid-gray",
           },
         }}
       />
-      <WhatsNewGate />
-      {/* Main content area that takes remaining space */}
-      <div className="flex-1 flex overflow-hidden">
-        <Sidebar
-          activeSection={currentSection}
-          onSectionChange={setCurrentSection}
-        />
-        {/* Scrollable content area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto">
-            <div className="flex flex-col items-center p-4 gap-4">
-              <AccessibilityPermissions />
-              {renderSettingsContent(currentSection)}
-            </div>
-          </div>
-        </div>
-      </div>
-      {/* Fixed footer at bottom */}
-      <Footer />
+      <KeyfloeDashboard
+        tab={tab}
+        onTab={setTab}
+        slots={{
+          keys: <KeybindingPanel />,
+          history: <DictationHistory />,
+          interview: <InterviewContextPanel />,
+          settings: <DictationPanel />,
+        }}
+      />
     </div>
   );
 }

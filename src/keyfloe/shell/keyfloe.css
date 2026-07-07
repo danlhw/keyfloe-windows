@@ -1,0 +1,444 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Keyfloe — brand design system (Windows shell)
+   Ported from the shipped Windows brand layer (git history src/global.css)
+   and matched 1:1 to the Mac app tokens (OneClickStyle.swift / KFColors).
+
+   Palette: warm-paper (#f5f1ea) on deep-ink (#0b0b0d), Fraunces-italic
+   display accents, Departure-Mono eyebrows, liquid-glass panels, gold ring.
+
+   Everything is prefixed `kf-` so it never collides with Handy's own
+   Tailwind tokens. Import this ONCE (App.tsx) — see INTEGRATION.md.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Brand fonts (bundled — Vite fingerprints these at build) ─────────── */
+@font-face {
+  font-family: "Geist";
+  src: url("./fonts/Geist-Variable.ttf") format("truetype");
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fraunces";
+  src: url("./fonts/Fraunces.ttf") format("truetype");
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fraunces";
+  src: url("./fonts/Fraunces-Italic.ttf") format("truetype");
+  font-weight: 300 900;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Departure Mono";
+  src: url("./fonts/DepartureMono-Regular.otf") format("opentype");
+  font-display: swap;
+}
+
+/* ── Tokens ───────────────────────────────────────────────────────────
+   Light = the website / Mac dashboard "warm paper" theme (default).
+   Dark  = deep-ink variant, auto-applied by OS preference AND overridable
+   with a hard `.kf-dark` / `.kf-light` class on any Keyfloe root. */
+.kf-root {
+  --kf-font-sans: "Geist", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --kf-font-serif: "Fraunces", Georgia, "Times New Roman", serif;
+  --kf-font-mono: "Departure Mono", ui-monospace, "Cascadia Mono", monospace;
+
+  /* accents (constant across themes) */
+  --kf-gold: #d69646;
+  --kf-blue: #6070ff;
+  --kf-green: #3ad17a;
+  --kf-red: #e5484d;
+
+  /* warm-paper (light) surface + ink scale — matches OneClickStyle */
+  --kf-paper: #f5f1ea;
+  --kf-bone: #ebe5d9;
+  --kf-ink-900: #0a0a0b;
+  --kf-ink-600: #5b5b5e;
+  --kf-ink-400: #9a9a9d;
+  --kf-hairline: rgba(10, 10, 11, 0.15);
+  --kf-panel-fill: rgba(255, 255, 255, 0.55);
+  --kf-panel-border: rgba(10, 10, 11, 0.10);
+  --kf-glass-grad: linear-gradient(160deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.42));
+  --kf-glass-border: rgba(10, 10, 11, 0.10);
+  --kf-glass-highlight: rgba(255, 255, 255, 0.65);
+  --kf-aurora-a: rgba(214, 150, 70, 0.10);
+  --kf-aurora-b: rgba(96, 112, 255, 0.10);
+  --kf-radius: 14px;
+}
+
+/* dark variant — applied by OS preference … */
+@media (prefers-color-scheme: dark) {
+  .kf-root:not(.kf-light) {
+    --kf-paper: #0d0d0e;
+    --kf-bone: #18181b;
+    --kf-ink-900: #f5f1ea;
+    --kf-ink-600: #a3a3a6;
+    --kf-ink-400: #78787c;
+    --kf-hairline: rgba(245, 241, 234, 0.12);
+    --kf-panel-fill: rgba(245, 241, 234, 0.05);
+    --kf-panel-border: rgba(245, 241, 234, 0.10);
+    --kf-glass-grad: linear-gradient(160deg, rgba(245, 241, 234, 0.09), rgba(245, 241, 234, 0.035));
+    --kf-glass-border: rgba(245, 241, 234, 0.14);
+    --kf-glass-highlight: rgba(255, 255, 255, 0.18);
+    --kf-aurora-a: rgba(214, 150, 70, 0.12);
+    --kf-aurora-b: rgba(96, 112, 255, 0.14);
+  }
+}
+
+/* … or forced with an explicit class (wins over OS preference). */
+.kf-root.kf-dark {
+  --kf-paper: #0d0d0e;
+  --kf-bone: #18181b;
+  --kf-ink-900: #f5f1ea;
+  --kf-ink-600: #a3a3a6;
+  --kf-ink-400: #78787c;
+  --kf-hairline: rgba(245, 241, 234, 0.12);
+  --kf-panel-fill: rgba(245, 241, 234, 0.05);
+  --kf-panel-border: rgba(245, 241, 234, 0.10);
+  --kf-glass-grad: linear-gradient(160deg, rgba(245, 241, 234, 0.09), rgba(245, 241, 234, 0.035));
+  --kf-glass-border: rgba(245, 241, 234, 0.14);
+  --kf-glass-highlight: rgba(255, 255, 255, 0.18);
+  --kf-aurora-a: rgba(214, 150, 70, 0.12);
+  --kf-aurora-b: rgba(96, 112, 255, 0.14);
+}
+
+/* ── Base surface ─────────────────────────────────────────────────────── */
+.kf-root {
+  font-family: var(--kf-font-sans);
+  color: var(--kf-ink-900);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  box-sizing: border-box;
+}
+.kf-root *,
+.kf-root *::before,
+.kf-root *::after {
+  box-sizing: border-box;
+}
+
+/* Full-window app background: warm paper with a soft two-corner aurora.
+   Applied to the dashboard + onboarding roots — NOT to the pill (its window
+   is transparent and only the glass chrome should paint). */
+.kf-app-bg {
+  background-color: var(--kf-paper);
+  background-image:
+    radial-gradient(120% 90% at 8% 0%, var(--kf-aurora-a), transparent 55%),
+    radial-gradient(120% 90% at 100% 100%, var(--kf-aurora-b), transparent 55%);
+}
+
+/* ── Type helpers (mirror the Mac editorial treatments) ───────────────── */
+.kf-display {
+  font-family: var(--kf-font-serif);
+  font-style: italic;
+  letter-spacing: -0.02em;
+  line-height: 1.02;
+}
+.kf-display-lead {
+  font-family: var(--kf-font-sans);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+.kf-eyebrow {
+  font-family: var(--kf-font-mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--kf-ink-600);
+  font-size: 10.5px;
+}
+.kf-mono {
+  font-family: var(--kf-font-mono);
+}
+.kf-muted { color: var(--kf-ink-600); }
+.kf-faint { color: var(--kf-ink-400); }
+
+/* ── Panels ───────────────────────────────────────────────────────────── */
+.kf-panel {
+  background: var(--kf-panel-fill);
+  border: 1px solid var(--kf-panel-border);
+  border-radius: var(--kf-radius);
+}
+.kf-panel-hairline {
+  border: 1px solid var(--kf-hairline);
+  border-radius: var(--kf-radius);
+  background: transparent;
+}
+
+/* Liquid glass — the pill + any floating card. Frosted, inner top highlight,
+   deep drop shadow. Matches PillBackground.swift. */
+.kf-glass {
+  background: var(--kf-glass-grad);
+  -webkit-backdrop-filter: blur(40px) saturate(1.4);
+  backdrop-filter: blur(40px) saturate(1.4);
+  border: 1px solid var(--kf-glass-border);
+  box-shadow:
+    inset 0 1.5px 0 var(--kf-glass-highlight),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+    0 24px 60px rgba(0, 0, 0, 0.30);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+.kf-btn {
+  font-family: var(--kf-font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 10px;
+  padding: 10px 18px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 0.08s ease, opacity 0.15s ease, background 0.15s ease;
+  user-select: none;
+}
+.kf-btn:active { transform: translateY(0.5px); }
+.kf-btn-primary {
+  background: var(--kf-ink-900);
+  color: var(--kf-paper);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+.kf-btn-primary:hover { opacity: 0.92; }
+.kf-btn-secondary {
+  background: transparent;
+  color: var(--kf-ink-900);
+  border-color: var(--kf-hairline);
+}
+.kf-btn-secondary:hover { background: var(--kf-ink-900); color: var(--kf-paper); opacity: 0.95; }
+.kf-btn-gold {
+  background: var(--kf-gold);
+  color: #1a1207;
+  box-shadow: 0 6px 18px rgba(214, 150, 70, 0.35);
+}
+
+/* ── Chips ────────────────────────────────────────────────────────────── */
+.kf-chip {
+  font-family: var(--kf-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--kf-ink-600);
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--kf-hairline);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.kf-keycap {
+  font-family: var(--kf-font-sans);
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--kf-ink-900);
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(127, 127, 127, 0.08);
+  border: 0.6px solid var(--kf-hairline);
+  display: inline-block;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────── */
+.kf-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  color: var(--kf-ink-600);
+  transition: background 0.12s ease, color 0.12s ease;
+  font-family: var(--kf-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.kf-sidebar-item:hover { background: rgba(127, 127, 127, 0.08); color: var(--kf-ink-900); }
+.kf-sidebar-item.kf-active {
+  background: var(--kf-ink-900);
+  color: var(--kf-paper);
+}
+
+/* ── Keyboard (mirror of MacKeyboardView / interactive-keyboard.tsx) ───── */
+.kf-kbd {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 28px 60px;
+  --kf-key-unit: 32px;
+}
+.kf-kbd.kf-kbd-compact { padding: 12px 20px; }
+.kf-kbd-row { display: flex; gap: 5px; }
+.kf-key {
+  position: relative;
+  height: var(--kf-key-unit);
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, rgba(127, 127, 127, 0.06), rgba(127, 127, 127, 0.10));
+  border: 0.75px solid var(--kf-hairline);
+  color: var(--kf-ink-600);
+  font-family: var(--kf-font-sans);
+  font-size: calc(var(--kf-key-unit) * 0.44);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+  overflow: hidden;
+  flex: none;
+}
+.kf-key:hover { transform: translateY(-1px); }
+.kf-key .kf-key-sub {
+  font-size: calc(var(--kf-key-unit) * 0.28);
+  color: var(--kf-ink-400);
+  line-height: 1;
+}
+.kf-key-modifier, .kf-key-fn {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: calc(var(--kf-key-unit) * 0.10);
+  font-size: calc(var(--kf-key-unit) * 0.28);
+}
+.kf-key-modifier .kf-key-label { align-self: center; }
+.kf-key-selected {
+  background: linear-gradient(180deg, var(--kf-gold), #b97a2f);
+  color: #1a1207;
+  border-color: rgba(214, 150, 70, 0.9);
+  box-shadow:
+    0 0 2px rgba(214, 150, 70, 0.6),
+    0 0 6px rgba(214, 150, 70, 0.5),
+    0 0 16px rgba(214, 150, 70, 0.45);
+}
+.kf-key-selected .kf-key-sub { color: rgba(26, 18, 7, 0.7); }
+/* travelling shimmer on a lit key */
+.kf-key-selected::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9px;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.75) 50%, transparent 70%);
+  mix-blend-mode: plus-lighter;
+  animation: kf-key-wave 3s linear infinite;
+}
+@keyframes kf-key-wave {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+/* elliptical edge fade for the full keyboard (site mask) */
+.kf-kbd:not(.kf-kbd-compact) {
+  -webkit-mask-image: radial-gradient(ellipse 90% 90% at 50% 60%,
+    #000 25%, rgba(0, 0, 0, 0.75) 55%, rgba(0, 0, 0, 0.18) 82%, transparent 100%);
+  mask-image: radial-gradient(ellipse 90% 90% at 50% 60%,
+    #000 25%, rgba(0, 0, 0, 0.75) 55%, rgba(0, 0, 0, 0.18) 82%, transparent 100%);
+}
+/* row reveal */
+.kf-kbd-row {
+  animation: kf-row-in 0.46s ease both;
+}
+.kf-kbd-row:nth-child(1) { animation-delay: 0.05s; }
+.kf-kbd-row:nth-child(2) { animation-delay: 0.16s; }
+.kf-kbd-row:nth-child(3) { animation-delay: 0.27s; }
+.kf-kbd-row:nth-child(4) { animation-delay: 0.38s; }
+.kf-kbd-row:nth-child(5) { animation-delay: 0.49s; }
+@keyframes kf-row-in {
+  from { opacity: 0; filter: blur(6px); transform: translateY(20px); }
+  to { opacity: 1; filter: blur(0); transform: translateY(0); }
+}
+
+/* ── Pill (iMessage-style liquid-glass activity log) ──────────────────── */
+.kf-pill {
+  border-radius: 26px;
+  padding: 0;
+  overflow: hidden;
+  color: var(--kf-ink-900);
+  min-width: 320px;
+  max-width: 420px;
+}
+.kf-pill-idle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+}
+.kf-pill-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--kf-gold);
+  box-shadow: 0 0 8px var(--kf-gold);
+}
+.kf-bubble {
+  max-width: 82%;
+  padding: 9px 13px;
+  border-radius: 16px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+.kf-bubble-user {
+  align-self: flex-end;
+  background: var(--kf-blue);
+  color: #fff;
+  border-bottom-right-radius: 5px;
+}
+.kf-bubble-ai {
+  align-self: flex-start;
+  background: rgba(127, 127, 127, 0.12);
+  color: var(--kf-ink-900);
+  border-bottom-left-radius: 5px;
+}
+.kf-bubble-step {
+  align-self: flex-start;
+  font-family: var(--kf-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--kf-ink-600);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kf-typing-dots span {
+  display: inline-block;
+  width: 5px; height: 5px; margin: 0 1px;
+  border-radius: 50%;
+  background: var(--kf-ink-400);
+  animation: kf-typing 1.2s infinite ease-in-out;
+}
+.kf-typing-dots span:nth-child(2) { animation-delay: 0.15s; }
+.kf-typing-dots span:nth-child(3) { animation-delay: 0.30s; }
+@keyframes kf-typing {
+  0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
+/* ── Progress bar (onboarding) ────────────────────────────────────────── */
+.kf-progress {
+  display: flex; gap: 4px; width: 100%;
+}
+.kf-progress span {
+  flex: 1; height: 2px; border-radius: 2px;
+  background: rgba(127, 127, 127, 0.18);
+}
+.kf-progress span.kf-on { background: var(--kf-ink-900); }
+
+/* ── Logo mark theme swap (KeyfloeLogo) ───────────────────────────────── */
+.kf-logo-dark { opacity: 0; }
+.kf-logo-light { opacity: 1; }
+@media (prefers-color-scheme: dark) {
+  .kf-root:not(.kf-light) .kf-logo-dark { opacity: 1; }
+  .kf-root:not(.kf-light) .kf-logo-light { opacity: 0; }
+}
+.kf-root.kf-dark .kf-logo-dark { opacity: 1; }
+.kf-root.kf-dark .kf-logo-light { opacity: 0; }
+.kf-root.kf-light .kf-logo-dark { opacity: 0; }
+.kf-root.kf-light .kf-logo-light { opacity: 1; }
+
+/* ── Scrollbars ───────────────────────────────────────────────────────── */
+.kf-root ::-webkit-scrollbar { width: 8px; height: 8px; }
+.kf-root ::-webkit-scrollbar-track { background: transparent; }
+.kf-root ::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--kf-ink-600) 22%, transparent);
+  border-radius: 4px;
+}
+.kf-root ::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--kf-ink-600) 34%, transparent);
+}
