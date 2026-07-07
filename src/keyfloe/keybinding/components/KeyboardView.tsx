@@ -34,9 +34,9 @@ export const KeyboardView: React.FC<KeyboardViewProps> = ({
               <KeyCap
                 key={def.id}
                 def={def}
-                binding={config.bindings[def.id]}
+                binding={config.bindings?.[def.id]}
                 selected={selectedKey === def.id}
-                customFeatures={config.custom_features}
+                customFeatures={config.custom_features ?? []}
                 onSelect={onSelectKey}
               />
             ))}
