@@ -186,7 +186,14 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     // keybinding::init loads keybindings.json, spawns the engine thread, and
     // installs the native WH_KEYBOARD_LL hook (a no-op off Windows).
     app_handle.manage(keyfloe::interview::InterviewState::default());
-    keyfloe::keybinding::init(app_handle);
+    // Harden startup: the tap/hold engine installs a native WH_KEYBOARD_LL hook
+    // (Windows). If that native path ever fails, it must NOT abort app launch —
+    // the dashboard/onboarding UI should still open. Contain any panic here.
+    if let Err(e) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        keyfloe::keybinding::init(app_handle);
+    })) {
+        log::error!("keyfloe::keybinding::init failed; continuing without the key engine: {e:?}");
+    }
 
     // Note: Shortcuts are NOT initialized here.
     // The frontend is responsible for calling the `initialize_shortcuts` command
