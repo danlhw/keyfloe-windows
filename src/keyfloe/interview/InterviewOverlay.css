@@ -9,8 +9,7 @@
   box-sizing: border-box;
   border-radius: 16px;
   overflow: hidden;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-family: "Geist", -apple-system, "Segoe UI", system-ui, sans-serif;
   color: #f2f2f5;
   background: rgba(24, 24, 27, 0.78);
   backdrop-filter: blur(28px) saturate(160%);
@@ -41,7 +40,7 @@
   background: #8a8a8f;
 }
 .kf-iv-dot[data-on="true"] {
-  background: #ff453a;
+  background: #e5484d;
   animation: kf-iv-pulse 1.6s ease-in-out infinite;
 }
 .kf-iv-actions {
@@ -73,14 +72,14 @@
   margin: 6px 8px 0;
   padding: 9px 10px;
   border-radius: 8px;
-  background: rgba(255, 149, 0, 0.1);
-  border: 0.5px solid rgba(255, 149, 0, 0.35);
+  background: rgba(214, 150, 70, 0.12);
+  border: 0.5px solid rgba(214, 150, 70, 0.4);
 }
 .kf-iv-banner strong {
   display: block;
   font-size: 11px;
   letter-spacing: 0.6px;
-  color: #ffb04d;
+  color: #e0a860;
   margin-bottom: 3px;
 }
 .kf-iv-banner p {
@@ -120,7 +119,7 @@
   height: 5px;
   margin-top: 6px;
   border-radius: 50%;
-  background: #0a84ff;
+  background: #6070ff;
   flex: none;
 }
 .kf-iv-empty {
@@ -140,7 +139,7 @@
   margin: 0;
 }
 .kf-iv-error {
-  color: #ff9f0a;
+  color: #d69646;
   font-size: 11px;
   margin-top: 6px;
 }
@@ -173,7 +172,7 @@
   margin: 0;
   padding: 9px 13px;
   border-radius: 16px;
-  background: rgba(10, 132, 255, 0.16);
+  background: rgba(96, 112, 255, 0.18);
   font-size: 13.5px;
   line-height: 1.5;
   color: #f2f2f5;
@@ -186,7 +185,7 @@
 .kf-iv-caret {
   width: 7px;
   height: 15px;
-  background: #0a84ff;
+  background: #6070ff;
   animation: kf-iv-blink 1s steps(2) infinite;
 }
 
@@ -205,7 +204,7 @@
   background: #8a8a8f;
 }
 .kf-iv-pulse[data-on="true"] {
-  background: #ff453a;
+  background: #e5484d;
   animation: kf-iv-pulse 1.6s ease-in-out infinite;
 }
 .kf-iv-listening {
@@ -225,7 +224,7 @@
   flex: 1;
   min-height: 2px;
   border-radius: 2px;
-  background: #0a84ff;
+  background: #6070ff;
   transition: height 0.09s linear;
 }
 .kf-iv-spacer {
@@ -235,7 +234,7 @@
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 1.2px;
-  color: #ff9f0a;
+  color: #d69646;
 }
 
 @keyframes kf-iv-pulse {

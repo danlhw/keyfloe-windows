@@ -15,12 +15,12 @@ interface ToggleRowProps {
 function ToggleRow({ icon, title, description, checked, onChange }: ToggleRowProps) {
   return (
     <label className="flex items-start gap-3 py-3 cursor-pointer select-none">
-      <div className="mt-0.5 text-neutral-500 dark:text-neutral-400">{icon}</div>
+      <div className="mt-0.5 kf-muted">{icon}</div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+        <div className="text-sm font-medium" style={{ color: "var(--kf-ink-900)" }}>
           {title}
         </div>
-        <div className="text-xs text-neutral-500 dark:text-neutral-400">
+        <div className="text-xs kf-muted">
           {description}
         </div>
       </div>
@@ -29,9 +29,8 @@ function ToggleRow({ icon, title, description, checked, onChange }: ToggleRowPro
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative shrink-0 mt-0.5 h-5 w-9 rounded-full transition-colors ${
-          checked ? "bg-blue-500" : "bg-neutral-300 dark:bg-neutral-600"
-        }`}
+        className="relative shrink-0 mt-0.5 h-5 w-9 rounded-full transition-colors"
+        style={{ background: checked ? "var(--kf-gold)" : "rgba(127,127,127,0.35)" }}
       >
         <span
           className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
@@ -62,10 +61,8 @@ export function DictationSettings() {
   return (
     <div className="space-y-6">
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-1">
-          Smart dictation
-        </h3>
-        <div className="divide-y divide-neutral-200 dark:divide-neutral-800">
+        <h3 className="kf-eyebrow mb-1">Smart dictation</h3>
+        <div className="divide-y divide-[color:var(--kf-hairline)]">
           <ToggleRow
             icon={<Sparkles size={16} />}
             title="AI polish"

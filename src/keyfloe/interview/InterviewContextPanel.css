@@ -7,8 +7,8 @@
   gap: 16px;
   max-width: 720px;
   padding: 20px;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--kf-font-sans, "Geist", "Segoe UI", system-ui, sans-serif);
+  color: var(--kf-ink-900);
 }
 .kf-ivc-head {
   display: flex;
@@ -23,15 +23,15 @@
 .kf-ivc-start {
   font-size: 13px;
   font-weight: 600;
-  color: #fff;
-  background: #0a84ff;
+  color: var(--kf-paper);
+  background: var(--kf-ink-900);
   border: none;
   border-radius: 999px;
   padding: 8px 16px;
   cursor: pointer;
 }
 .kf-ivc-start:hover {
-  filter: brightness(1.08);
+  opacity: 0.9;
 }
 .kf-ivc-sub {
   margin: -6px 0 0;
@@ -41,10 +41,10 @@
 }
 
 .kf-ivc-card {
-  border: 0.5px solid rgba(128, 128, 128, 0.3);
-  border-radius: 12px;
+  border: 1px solid var(--kf-panel-border, rgba(128, 128, 128, 0.3));
+  border-radius: 14px;
   padding: 16px;
-  background: rgba(128, 128, 128, 0.05);
+  background: var(--kf-panel-fill, rgba(128, 128, 128, 0.05));
 }
 .kf-ivc-card h3 {
   margin: 0 0 4px;
@@ -159,14 +159,9 @@
   gap: 12px;
   padding: 20px;
   border-radius: 14px;
-  background: var(--kf-surface, #1c1c1e);
-  color: var(--kf-text, #f2f2f5);
-}
-@media (prefers-color-scheme: light) {
-  .kf-ivc-modal-body {
-    background: var(--kf-surface, #ffffff);
-    color: var(--kf-text, #1c1c1e);
-  }
+  background: var(--kf-paper, #ffffff);
+  color: var(--kf-ink-900, #1c1c1e);
+  border: 1px solid var(--kf-hairline, rgba(128, 128, 128, 0.3));
 }
 .kf-ivc-name {
   font-size: 15px;
@@ -187,7 +182,7 @@
   margin-top: 4px;
 }
 .kf-ivc-primary {
-  color: #fff;
-  background: #0a84ff;
+  color: var(--kf-paper);
+  background: var(--kf-ink-900);
   border-color: transparent;
 }

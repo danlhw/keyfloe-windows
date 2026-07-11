@@ -20,19 +20,17 @@ export function VocabularyManager() {
   return (
     <section>
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+        <h3 className="kf-eyebrow">
           Vocabulary
           {vocabulary.length > 0 && (
-            <span className="ml-1.5 text-neutral-300 dark:text-neutral-600">
-              {vocabulary.length}
-            </span>
+            <span className="ml-1.5 kf-faint">{vocabulary.length}</span>
           )}
         </h3>
         {vocabulary.length > 0 && (
           <button
             type="button"
             onClick={() => void clearVocabulary()}
-            className="text-xs text-neutral-400 hover:text-red-500 transition-colors"
+            className="text-xs kf-faint transition-colors hover:opacity-70"
           >
             Clear all
           </button>
@@ -45,20 +43,22 @@ export function VocabularyManager() {
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && void submit()}
           placeholder="Add a name, brand, or term…"
-          className="flex-1 rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-blue-500"
+          className="flex-1 rounded-md bg-transparent px-3 py-1.5 text-sm outline-none focus:border-[color:var(--kf-gold)]"
+          style={{ border: "1px solid var(--kf-hairline)", color: "var(--kf-ink-900)" }}
         />
         <button
           type="button"
           onClick={() => void submit()}
           disabled={!draft.trim()}
-          className="inline-flex items-center gap-1 rounded-md bg-blue-500 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+          className="kf-btn kf-btn-primary inline-flex items-center gap-1 disabled:opacity-40"
+          style={{ padding: "6px 12px" }}
         >
           <Plus size={14} /> Add
         </button>
       </div>
 
       {vocabulary.length === 0 ? (
-        <p className="text-xs text-neutral-400">
+        <p className="text-xs kf-faint">
           No terms yet. Words you dictate often are learned automatically.
         </p>
       ) : (
@@ -66,14 +66,15 @@ export function VocabularyManager() {
           {vocabulary.map((t) => (
             <span
               key={t.canonical}
-              className="group inline-flex items-center gap-1 rounded-full bg-neutral-100 dark:bg-neutral-800 pl-2.5 pr-1 py-1 text-xs"
+              className="kf-chip group inline-flex items-center gap-1 pl-2.5 pr-1 py-1"
               title={`Seen ${t.count}×`}
             >
               {t.canonical}
               <button
                 type="button"
                 onClick={() => void removeTerm(t.canonical)}
-                className="rounded-full p-0.5 text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-red-500"
+                className="rounded-full p-0.5 hover:bg-black/10"
+                style={{ color: "var(--kf-ink-400)" }}
                 aria-label={`Remove ${t.canonical}`}
               >
                 <X size={12} />

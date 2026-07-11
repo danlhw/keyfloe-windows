@@ -12,12 +12,12 @@ function StatTile({
   label: string;
 }) {
   return (
-    <div className="flex-1 rounded-lg border border-neutral-200 dark:border-neutral-800 p-4">
-      <div className="mb-2 text-neutral-400">{icon}</div>
-      <div className="text-2xl font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
+    <div className="kf-panel flex-1 p-4">
+      <div className="mb-2 kf-faint">{icon}</div>
+      <div className="text-2xl font-semibold tabular-nums" style={{ color: "var(--kf-ink-900)" }}>
         {value}
       </div>
-      <div className="text-xs text-neutral-500 dark:text-neutral-400">{label}</div>
+      <div className="text-xs kf-muted">{label}</div>
     </div>
   );
 }

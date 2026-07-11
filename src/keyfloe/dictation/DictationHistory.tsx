@@ -27,11 +27,11 @@ function Row({ entry, onDelete }: { entry: DictationLogEntry; onDelete: () => vo
     }
   };
   return (
-    <div className="group rounded-lg border border-neutral-200 dark:border-neutral-800 p-3">
-      <p className="text-sm text-neutral-800 dark:text-neutral-200 whitespace-pre-wrap break-words">
+    <div className="kf-panel group p-3">
+      <p className="text-sm whitespace-pre-wrap break-words" style={{ color: "var(--kf-ink-900)" }}>
         {entry.text}
       </p>
-      <div className="mt-2 flex items-center gap-2 text-xs text-neutral-400">
+      <div className="mt-2 flex items-center gap-2 text-xs kf-faint">
         <span>{timeAgo(entry.recorded_at)}</span>
         {entry.pasted_into && (
           <>
@@ -43,15 +43,16 @@ function Row({ entry, onDelete }: { entry: DictationLogEntry; onDelete: () => vo
           <button
             type="button"
             onClick={() => void copy()}
-            className="rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+            className="rounded p-1 hover:bg-black/5"
             aria-label="Copy"
           >
-            {copied ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
+            {copied ? <Check size={13} style={{ color: "var(--kf-green)" }} /> : <Copy size={13} />}
           </button>
           <button
             type="button"
             onClick={onDelete}
-            className="rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-red-500"
+            className="rounded p-1 hover:bg-black/5"
+            style={{ color: "var(--kf-ink-600)" }}
             aria-label="Delete"
           >
             <Trash2 size={13} />
@@ -79,21 +80,19 @@ export function DictationHistory() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-          Recent transcripts
-        </h3>
+        <h3 className="kf-eyebrow">Recent transcripts</h3>
         {log.length > 0 && (
           <button
             type="button"
             onClick={() => void clearLog()}
-            className="text-xs text-neutral-400 hover:text-red-500 transition-colors"
+            className="text-xs kf-faint transition-colors hover:opacity-70"
           >
             Clear all
           </button>
         )}
       </div>
       {log.length === 0 ? (
-        <p className="text-xs text-neutral-400">
+        <p className="text-xs kf-faint">
           Your dictations will appear here for 30 days.
         </p>
       ) : (

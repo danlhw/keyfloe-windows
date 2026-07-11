@@ -49,14 +49,11 @@ export function LiveCaptionOverlay() {
     <div className="fixed inset-x-0 bottom-6 flex justify-center pointer-events-none px-4">
       <div className="max-w-xl rounded-2xl bg-black/80 backdrop-blur px-4 py-2.5 shadow-lg flex items-center gap-2">
         {polishing && (
-          <Sparkles size={14} className="shrink-0 text-blue-300 animate-pulse" />
+          <Sparkles size={14} className="shrink-0 animate-pulse" style={{ color: "var(--kf-gold, #d69646)" }} />
         )}
         <span
-          className={`text-sm leading-snug ${
-            polishing
-              ? "text-neutral-300 animate-pulse"
-              : "text-white"
-          }`}
+          className={`text-sm leading-snug ${polishing ? "animate-pulse" : ""}`}
+          style={{ color: polishing ? "rgba(255,255,255,0.72)" : "#fff" }}
         >
           {text}
         </span>
