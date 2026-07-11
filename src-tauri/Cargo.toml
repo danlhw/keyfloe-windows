@@ -79,7 +79,7 @@ sha2 = "0.10"
 transcribe-rs = { version = "0.3.8", features = ["onnx"] }
 transcribe-cpp = { version = "0.1.1", default-features = false }
 handy-keys = "0.2.4"
-ferrous-opencc = "0.2.3"
+ferrous-opencc = { version = "0.2.3", optional = true }
 clap = { version = "4", features = ["derive"] }
 specta = "=2.0.0-rc.22"
 specta-typescript = "0.0.9"
@@ -97,6 +97,15 @@ tauri-plugin-autostart = "2.5.1"
 tauri-plugin-global-shortcut = "2.3.1"
 tauri-plugin-single-instance = "2.3.2"
 tauri-plugin-updater = "2.10.0"
+
+[features]
+# Chinese Simplified<->Traditional conversion of transcription output (OpenCC).
+# On by default (real Windows/CI builds keep it). Disabled only for the
+# macOS-hosted cargo-xwin cross-compile: ferrous-opencc's build script spawns a
+# nested `cargo metadata` that inherits cargo-xwin's target linker flag and
+# fails the host rustc probe. Irrelevant to a non-Chinese test build.
+default = ["chinese-conversion"]
+chinese-conversion = ["dep:ferrous-opencc"]
 
 [target.'cfg(windows)'.dependencies]
 # ONNX Runtime on Windows is CPU-only (no ort-directml), matching macOS/Linux.
@@ -140,11 +149,13 @@ winreg = "0.55"
 # handy.exe and we ship zero DLLs, which sidesteps the installer's per-DLL
 # signtool verify entirely. CI pins -DGGML_NATIVE=OFF (see build.yml) so the
 # static build targets a portable ARM baseline, not the build runner's CPU.
+# NOTE: for the macOS-hosted cross-compile (cargo-xwin) test build we link
+# transcribe-cpp STATICALLY CPU-only (no vulkan / no dynamic-backends), matching
+# the ARM posture below. Vulkan needs the SPIRV shader generator + Vulkan SDK,
+# which do not cross-compile from macOS. The GPU (vulkan) + dynamic-backends
+# posture is restored for the on-Windows CI build (see windows-build.yml).
 [target.'cfg(all(windows, target_arch = "x86_64"))'.dependencies]
-transcribe-cpp = { version = "0.1.1", default-features = false, features = [
-  "dynamic-backends",
-  "vulkan",
-] }
+transcribe-cpp = { version = "0.1.1", default-features = false }
 
 [target.'cfg(all(windows, target_arch = "aarch64"))'.dependencies]
 transcribe-cpp = { version = "0.1.1", default-features = false }

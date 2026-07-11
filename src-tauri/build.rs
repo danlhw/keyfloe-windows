@@ -1,6 +1,11 @@
 fn main() {
+    // The #[cfg] gates on the HOST (build.rs runs on this machine); also gate on
+    // the TARGET so a macOS-hosted cross-compile to Windows does not emit Apple
+    // `framework=` link args (which only link on Apple targets).
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    build_apple_intelligence_bridge();
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+        build_apple_intelligence_bridge();
+    }
 
     generate_tray_translations();
 

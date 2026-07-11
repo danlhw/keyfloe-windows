@@ -14,6 +14,7 @@ use crate::utils::{
     self, show_processing_overlay, show_recording_overlay, show_transcribing_overlay,
 };
 use crate::TranscriptionCoordinator;
+#[cfg(feature = "chinese-conversion")]
 use ferrous_opencc::{config::BuiltinConfig, OpenCC};
 use log::{debug, error, warn};
 use once_cell::sync::Lazy;
@@ -329,6 +330,15 @@ async fn maybe_convert_chinese_variant(
         return None;
     }
 
+    #[cfg(not(feature = "chinese-conversion"))]
+    {
+        let _ = transcription;
+        debug!("chinese-conversion feature disabled; returning original transcription");
+        None
+    }
+
+    #[cfg(feature = "chinese-conversion")]
+    {
     debug!(
         "Starting Chinese variant conversion using OpenCC for language: {}",
         effective_language
@@ -357,6 +367,7 @@ async fn maybe_convert_chinese_variant(
             error!("Failed to initialize OpenCC converter: {}. Falling back to original transcription.", e);
             None
         }
+    }
     }
 }
 
