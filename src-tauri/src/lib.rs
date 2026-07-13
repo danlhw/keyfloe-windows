@@ -322,6 +322,18 @@ fn initialize_core_logic(app_handle: &AppHandle) {
 
     // Create the recording overlay window (hidden by default)
     utils::create_recording_overlay(app_handle);
+
+    // Keyfloe: pre-create the pill window (the single visual record of all AI
+    // activity) so the first chat/snapshot/agent event lands instantly. Hidden
+    // + non-activating until a feature reveals it. A failure here must not abort
+    // launch, so it's best-effort.
+    if let Err(e) = keyfloe::shell::ensure_pill(app_handle) {
+        log::error!("keyfloe::shell::ensure_pill failed; pill will lazy-create: {e}");
+    }
+    // Pre-create the invisible interview overlay so the first toggle is instant.
+    if let Err(e) = keyfloe::interview::overlay::ensure_overlay(app_handle) {
+        log::error!("keyfloe::interview overlay pre-create failed: {e}");
+    }
 }
 
 #[tauri::command]
@@ -668,6 +680,12 @@ pub fn run(cli_args: CliArgs) {
             // the fn but not its `__cmd__`/`__specta__fn__` siblings.
             keyfloe::agent::commands::run_agent_command,
             keyfloe::agent::commands::run_agent_voice_command,
+            keyfloe::agent::commands::start_agent_capture,
+            keyfloe::agent::commands::stop_agent_capture,
+            keyfloe::agent::commands::respond_agent_confirmation,
+            // Pill window — the single visual record of all AI activity (P1-02).
+            keyfloe::shell::pill_emit_message,
+            keyfloe::shell::open_chat_pill,
             // Interview mode (D)
             keyfloe::interview::interview_start,
             keyfloe::interview::interview_stop,

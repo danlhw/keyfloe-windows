@@ -14,6 +14,13 @@ export type { OnboardingPermissions } from "./Onboarding";
 export { KeyfloePill } from "./Pill";
 export type { PillMessage, PillRole, PillMode } from "./Pill";
 
+export {
+  pillStore,
+  usePillStore,
+  initPillListeners,
+} from "./pillMessageStore";
+export type { PillMessageEvent } from "./pillMessageStore";
+
 export { KeyfloeKeyboard } from "./components/KeyfloeKeyboard";
 export { KeyfloeLogo } from "./components/KeyfloeLogo";
 export {
@@ -36,6 +43,6 @@ export {
 } from "./Tabs";
 
 export { KEY_ACTIONS } from "./keyActions";
-export type { KeyActionDef, Trigger } from "./keyActions";
+export type { KeyActionDef, Trigger, FeatureId } from "./keyActions";
 export { KF } from "./tokens";
 export type { KfTheme } from "./tokens";

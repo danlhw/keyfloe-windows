@@ -46,14 +46,29 @@ const ZX: KeyDef[] = [
 ];
 
 function bottomRow(win: boolean): KeyDef[] {
+  if (win) {
+    // Real Windows bottom row. Ids match the native hook (keys.rs): lctrl /
+    // lwin / lalt / ralt / apps / rctrl. No `fn` — it is EC-firmware
+    // intercepted on Windows and can never be bound. Right-Ctrl is the default
+    // Keyfloe activation key, so it must be present and lightable.
+    return [
+      { id: "lctrl", render: "modifier", label: "ctrl", width: 1.3 },
+      { id: "lwin", render: "modifier", label: "win", sub: "⊞", width: 1.3 },
+      { id: "lalt", render: "modifier", label: "alt", width: 1.3 },
+      { id: "space", render: "empty", width: 5.0 },
+      { id: "ralt", render: "modifier", label: "alt", width: 1.3 },
+      { id: "apps", render: "modifier", label: "menu", sub: "▤", width: 1.3 },
+      { id: "rctrl", render: "modifier", label: "ctrl", width: 1.3 },
+    ];
+  }
   return [
     { id: "fn", render: "fn", label: "fn" },
     { id: "lctrl", render: "modifier", label: "control", sub: "⌃", width: 1.3 },
-    { id: "lopt", render: "modifier", label: win ? "alt" : "option", sub: win ? "Alt" : "⌥", width: 1.3 },
-    { id: "lcmd", render: "modifier", label: win ? "win" : "command", sub: win ? "⊞" : "⌘", width: 1.6 },
+    { id: "lopt", render: "modifier", label: "option", sub: "⌥", width: 1.3 },
+    { id: "lcmd", render: "modifier", label: "command", sub: "⌘", width: 1.6 },
     { id: "space", render: "empty", width: 5.4 },
-    { id: "rcmd", render: "modifier", label: win ? "win" : "command", sub: win ? "⊞" : "⌘", width: 1.6 },
-    { id: "ropt", render: "modifier", label: win ? "alt" : "option", sub: win ? "Alt" : "⌥", width: 1.3 },
+    { id: "rcmd", render: "modifier", label: "command", sub: "⌘", width: 1.6 },
+    { id: "ropt", render: "modifier", label: "option", sub: "⌥", width: 1.3 },
   ];
 }
 

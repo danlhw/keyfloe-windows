@@ -1,12 +1,21 @@
 // Live-interview hook: subscribes to the Rust session's events and exposes
-// start / stop / ask actions. Used by the overlay window; can also drive a
-// toggle button in the main app. Uses raw `invoke`/`listen` so it works before
-// the commands are wired into the generated `bindings.ts`.
+// start / stop / toggle / ask + overlay controls. Used by BOTH the overlay
+// window AND the dashboard's InterviewTab — the Rust session is the single
+// source of truth and emits its events to every window, so either surface can
+// drive the session and both stay in sync. Uses raw `invoke`/`listen` so it
+// works before the commands are wired into the generated `bindings.ts`.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { CMD, EV, type InterviewStateDto, type InterviewTurn } from "./types";
+import {
+  ensureInterviewOverlay,
+  setInterviewOverlayVisible,
+  startInterview,
+  stopInterview,
+  toggleInterview,
+} from "./interviewActions";
 
 export interface AnswerState {
   streaming: boolean;
@@ -76,16 +85,29 @@ export function useInterviewSession() {
     };
   }, []);
 
-  const start = useCallback(() => invoke(CMD.start).catch(console.error), []);
-  const stop = useCallback(() => invoke(CMD.stop).catch(console.error), []);
-  const toggle = useCallback(
-    () => invoke<boolean>(CMD.toggle).catch((e) => (console.error(e), false)),
-    [],
-  );
+  const start = useCallback(() => startInterview(), []);
+  const stop = useCallback(() => stopInterview(), []);
+  const toggle = useCallback(() => toggleInterview(), []);
   const askAnswer = useCallback(
     () => invoke(CMD.askAnswer).catch(console.error),
     [],
   );
+  const ensureOverlay = useCallback(() => ensureInterviewOverlay(), []);
+  const setOverlayVisible = useCallback(
+    (visible: boolean) => setInterviewOverlayVisible(visible),
+    [],
+  );
 
-  return { turns, state, micLevel, answer, start, stop, toggle, askAnswer };
+  return {
+    turns,
+    state,
+    micLevel,
+    answer,
+    start,
+    stop,
+    toggle,
+    askAnswer,
+    ensureOverlay,
+    setOverlayVisible,
+  };
 }

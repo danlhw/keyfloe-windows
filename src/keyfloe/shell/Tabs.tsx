@@ -216,41 +216,71 @@ export function AccountTab({
   account,
   onSignIn,
   onSignOut,
+  signInSlot,
+  connectionsSlot,
   slot,
 }: {
-  account?: { email?: string; plan?: string; unlimited?: boolean };
+  account?: { email?: string; name?: string; plan?: string; unlimited?: boolean };
   onSignIn?: () => void;
   onSignOut?: () => void;
+  /** The real Supabase sign-in form (auth/SignIn) — shown when signed out. */
+  signInSlot?: React.ReactNode;
+  /** Me → Connections (auth/Connections) — shown when signed in. */
+  connectionsSlot?: React.ReactNode;
   slot?: React.ReactNode;
 }) {
+  if (slot) {
+    return (
+      <TabScroll>
+        <TabHeader eyebrow="Account" title="Your " accent="Keyfloe." />
+        {slot}
+      </TabScroll>
+    );
+  }
+
+  const signedIn = !!account?.email;
+  const planLabel = account?.unlimited
+    ? "Pro · unlimited"
+    : account?.plan
+    ? account.plan.charAt(0).toUpperCase() + account.plan.slice(1)
+    : "Free";
+
   return (
     <TabScroll>
       <TabHeader eyebrow="Account" title="Your " accent="Keyfloe." />
-      {slot ?? (
-        <Panel style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14 }}>
-          {account?.email ? (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <Chip dot="var(--kf-green)">Signed in</Chip>
-                <span style={{ fontSize: 15, fontWeight: 600 }}>{account.email}</span>
-              </div>
-              <span className="kf-muted" style={{ fontSize: 13 }}>
-                Plan: {account.unlimited ? "Pro · unlimited" : account.plan ?? "Free"}. Your dictation,
-                AI answers and key bindings sync to this account.
-              </span>
-              <button className="kf-btn kf-btn-secondary" style={{ alignSelf: "flex-start" }} onClick={onSignOut}>Sign out</button>
-            </>
-          ) : (
-            <>
-              <Eyebrow>Sign in · required for hotkeys</Eyebrow>
-              <span className="kf-muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
-                Keyfloe's hotkeys (fn, Ctrl, Alt, Win) only fire once you sign in. Sign in to sync your
-                stats, history and bindings across devices.
-              </span>
-              <button className="kf-btn kf-btn-primary" style={{ alignSelf: "flex-start" }} onClick={onSignIn}>Sign in</button>
-            </>
-          )}
-        </Panel>
+      {signedIn ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <Panel style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Chip dot="var(--kf-green)">Signed in</Chip>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>{account!.name || account!.email}</span>
+              {account!.name ? <span className="kf-muted" style={{ fontSize: 12.5 }}>{account!.email}</span> : null}
+            </div>
+            <span className="kf-muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
+              Plan: {planLabel}. Your dictation, AI answers and key bindings sync to this account.
+              A Pro plan on Mac is Pro here too.
+            </span>
+            <button className="kf-btn kf-btn-secondary" style={{ alignSelf: "flex-start" }} onClick={onSignOut}>
+              Sign out
+            </button>
+          </Panel>
+          {connectionsSlot ? (
+            <Panel style={{ padding: 24 }}>{connectionsSlot}</Panel>
+          ) : null}
+        </div>
+      ) : (
+        signInSlot ?? (
+          <Panel style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14, maxWidth: 420 }}>
+            <Eyebrow>Sign in · required for hotkeys</Eyebrow>
+            <span className="kf-muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
+              Keyfloe's hotkeys (Ctrl, Alt, Caps Lock, Menu) only fire once you sign in. Sign in to
+              sync your stats, history and bindings across devices.
+            </span>
+            <button className="kf-btn kf-btn-primary" style={{ alignSelf: "flex-start" }} onClick={onSignIn}>
+              Sign in
+            </button>
+          </Panel>
+        )
       )}
     </TabScroll>
   );
@@ -264,7 +294,7 @@ export function SettingsTab({ slot }: { slot?: React.ReactNode }) {
       {slot ?? (
         <EmptyState
           title="Settings live here"
-          body="Microphone, dictation model, startup, appearance and updates. Handy's existing settings panels mount into this branded shell — see INTEGRATION.md."
+          body="Microphone, dictation model, language, startup, paste method, sounds, appearance and updates — plus AI-polish, custom vocabulary and your dictation stats. All of it mounts into this branded shell."
         />
       )}
     </TabScroll>

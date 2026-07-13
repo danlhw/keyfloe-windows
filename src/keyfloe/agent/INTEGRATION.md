@@ -99,6 +99,26 @@ Two ways:
 pill can echo "Heard: …") and then runs the command. For a **typed** command
 (no mic), the FE composer calls `run_agent_command` directly.
 
+**UPDATED — the voice trigger is now fully self-contained; `actions.rs` is NOT
+touched.** The key→action dispatcher (P1-01) routes the Floe agent binding to
+two functions exported from `src/keyfloe/agent`:
+
+```ts
+import { startAgentCapture, stopAgentCapture } from "@/keyfloe/agent";
+// agent_trigger { phase: "start" } → startAgentCapture();   // key down (PTT)
+// agent_trigger { phase: "stop"  } → stopAgentCapture();    // key up
+```
+
+`startAgentCapture` invokes the Rust `start_agent_capture` command (begins a
+Handy recording under the dedicated binding id `"agent"`); `stopAgentCapture`
+invokes `stop_agent_capture` (stops, transcribes on-device, then calls
+`run_agent_voice_command` with the transcript). Nothing gets pasted. The pill
+reacts to the emitted events, so these two functions work from any window
+(including the main dashboard window where the dispatcher lives).
+
+Human-in-the-loop: risky steps (type_text / click) emit `keyfloe://agent/confirm`;
+the pill shows Allow / Cancel and calls the `respond_agent_confirmation` command.
+
 ## 4. Mount the pill UI (`App.tsx` / pill window)
 
 Mount `<AgentPill />` wherever the pill surface lives (its own overlay window,

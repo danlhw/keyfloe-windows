@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Keyfloe</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      #root,
+      .kf-pill-window {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      /* Anchor the glass pill to the bottom-center of the window; the window
+         itself (size + position + click-through) is owned by lib.rs. */
+      .kf-pill-window {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 8px;
+        padding: 10px;
+        box-sizing: border-box;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/keyfloe/shell/pill-entry.tsx"></script>
+  </body>
+</html>

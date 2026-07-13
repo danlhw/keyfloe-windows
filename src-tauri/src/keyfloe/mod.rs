@@ -10,4 +10,5 @@ pub mod agent;
 pub mod dictation;
 pub mod interview;
 pub mod keybinding;
+pub mod shell;
 pub mod snapshot;

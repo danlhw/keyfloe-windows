@@ -176,7 +176,15 @@ pub fn prompt_terms(app: &AppHandle) -> Option<String> {
 }
 
 /// The whisper decode-prompt hint (feed alongside `settings.custom_words`).
+///
+/// Gated on the `vocabulary_prompt_enabled` dictation setting so the integrator
+/// can prepend this unconditionally in `managers/transcription.rs` (P8-26) — it
+/// returns an empty string (which the caller skips) when the user has turned the
+/// feature off, or when there are no active learned terms.
 pub fn whisper_prompt_hint(app: &AppHandle) -> String {
+    if !super::settings::load(app).vocabulary_prompt_enabled {
+        return String::new();
+    }
     match prompt_terms(app) {
         Some(names) => format!("Vocabulary the speaker uses: {names}."),
         None => String::new(),

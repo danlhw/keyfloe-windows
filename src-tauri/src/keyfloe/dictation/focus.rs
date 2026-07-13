@@ -14,6 +14,7 @@
 //! On non-Windows the capture is a safe no-op returning `None`.
 
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
 
 /// The foreground app captured before the pill took focus.
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -24,6 +25,34 @@ pub struct ForegroundApp {
     pub bundle_id: Option<String>,
     /// Raw HWND as an integer so it can cross the FFI boundary / be stored.
     pub hwnd: i64,
+}
+
+/// The foreground window captured at record START, stashed here until the
+/// stop/paste path needs it. This decouples the two `actions.rs` edit sites: the
+/// integrator calls [`capture_and_stash`] in `TranscribeAction::start` (before
+/// any Keyfloe overlay/pill can steal focus) and [`take_stashed`] in the stop
+/// task — so the integrator never has to invent storage or thread the value
+/// through Handy's plumbing. `Mutex<Option<_>>` (const-constructible since Rust
+/// 1.63) is enough: dictation is inherently one-at-a-time (push-to-talk).
+static STASH: Mutex<Option<ForegroundApp>> = Mutex::new(None);
+
+/// Capture the current foreground window and stash it for the stop path. Call
+/// this the instant a dictation trigger fires (record start), BEFORE showing any
+/// Keyfloe UI. Overwrites any previous stash (a new press supersedes an
+/// abandoned one). Returns the captured app for convenience.
+pub fn capture_and_stash() -> Option<ForegroundApp> {
+    let fg = capture_foreground();
+    if let Ok(mut slot) = STASH.lock() {
+        *slot = fg.clone();
+    }
+    fg
+}
+
+/// Take (and clear) the foreground window stashed at record start. Call this in
+/// the stop task to route the paste back to the user's app. Returns `None` if
+/// nothing was stashed (e.g. off-Windows, or capture failed).
+pub fn take_stashed() -> Option<ForegroundApp> {
+    STASH.lock().ok().and_then(|mut slot| slot.take())
 }
 
 /// Capture the current foreground window so paste can be routed back to it.

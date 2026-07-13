@@ -18,16 +18,21 @@
 //! carries the parsed prose, cited URLs, follow-up chips and any report card.
 
 use log::{error, info};
+use once_cell::sync::Lazy;
 use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::sync::mpsc::Sender as StdSender;
+use std::sync::Mutex as StdMutex;
 use tauri::{AppHandle, Emitter};
 
+use crate::keyfloe::agent::auth;
 use crate::keyfloe::agent::parser;
 use crate::keyfloe::agent::tools;
 use crate::keyfloe::agent::types::*;
 
-/// Shared backend route (buffered Anthropic proxy). See
-/// `../keyfloe-1/worker/src/routes/agent.ts`.
-const AGENT_ENDPOINT: &str = "https://www.keyfloe.com/v1/agent";
+/// Path appended to the resolved backend base for the buffered Anthropic proxy.
+/// See `../keyfloe-1/worker/src/routes/agent.ts`.
+const AGENT_PATH: &str = "/v1/agent";
 const ANTHROPIC_ENDPOINT: &str = "https://api.anthropic.com/v1/messages";
 
 // Match the Mac's model choices (BackgroundTaskAgent) so both platforms behave
@@ -36,9 +41,80 @@ const DEFAULT_MODEL: &str = "claude-haiku-4-5-20251001";
 const SONNET_MODEL: &str = "claude-sonnet-4-6";
 const MAX_TURNS: usize = 16;
 
+/// How long a risky-action confirmation prompt waits for the user before it
+/// defaults to "denied" (so a run never hangs forever if the pill is closed).
+const CONFIRM_TIMEOUT_SECS: u64 = 120;
+
 pub const EVT_STARTED: &str = "keyfloe://agent/started";
 pub const EVT_STEP: &str = "keyfloe://agent/step";
 pub const EVT_RESULT: &str = "keyfloe://agent/result";
+/// Echo of what the mic heard, before the run officially starts.
+pub const EVT_VOICE: &str = "keyfloe://agent/voice-command";
+/// The mic is capturing / has stopped capturing a spoken command. Drives the
+/// pill's "Listening…" spinner before the run officially starts.
+pub const EVT_LISTENING: &str = "keyfloe://agent/listening";
+/// A risky/destructive tool call is awaiting the user's approval (PRD
+/// principle #4 — human-in-the-loop). The pill shows Allow / Cancel.
+pub const EVT_CONFIRM: &str = "keyfloe://agent/confirm";
+
+/// Pending human-in-the-loop confirmations, keyed by the step id the user is
+/// approving. A module-static registry (not Tauri managed state) so the agent
+/// stays self-contained and needs no `.manage()` wiring in `lib.rs`.
+static PENDING_CONFIRMS: Lazy<StdMutex<HashMap<String, StdSender<bool>>>> =
+    Lazy::new(|| StdMutex::new(HashMap::new()));
+
+/// Called by the `respond_agent_confirmation` command when the user taps Allow
+/// or Cancel on a pending step. Returns `true` if a run was actually waiting on
+/// this id. Safe to call for an unknown/stale id (returns `false`).
+pub fn resolve_confirmation(step_id: &str, approved: bool) -> bool {
+    if let Ok(mut map) = PENDING_CONFIRMS.lock() {
+        if let Some(tx) = map.remove(step_id) {
+            let _ = tx.send(approved);
+            return true;
+        }
+    }
+    false
+}
+
+/// Emit a confirmation request for one risky tool call and block (off the async
+/// pool) until the user answers or the timeout elapses. Denies on timeout.
+async fn request_confirmation(
+    app: &AppHandle,
+    task_id: &str,
+    step: &AgentStep,
+    tool: &str,
+) -> bool {
+    let (tx, rx) = std::sync::mpsc::channel::<bool>();
+    let step_id = step.id.clone();
+    if let Ok(mut map) = PENDING_CONFIRMS.lock() {
+        map.insert(step_id.clone(), tx);
+    }
+
+    let _ = app.emit(
+        EVT_CONFIRM,
+        json!({
+            "taskId": task_id,
+            "stepId": step_id,
+            "tool": tool,
+            "title": step.title,
+            "detail": step.detail,
+        }),
+    );
+
+    // recv blocks; run it on the blocking pool so we don't stall an async worker.
+    let approved = tauri::async_runtime::spawn_blocking(move || {
+        rx.recv_timeout(std::time::Duration::from_secs(CONFIRM_TIMEOUT_SECS))
+            .unwrap_or(false)
+    })
+    .await
+    .unwrap_or(false);
+
+    // Drop any lingering sender (e.g. on timeout) so the map doesn't leak.
+    if let Ok(mut map) = PENDING_CONFIRMS.lock() {
+        map.remove(&step_id);
+    }
+    approved
+}
 
 /// Run one command end-to-end. Emits events throughout and also returns the
 /// final result so the caller (command handler) can await it.
@@ -59,7 +135,7 @@ pub async fn run(app: &AppHandle, prompt: String, task_id: String) -> AgentResul
 }
 
 async fn run_loop(app: &AppHandle, prompt: &str, task_id: &str) -> AgentResultEvent {
-    let dev_key = std::env::var("ANTHROPIC_API_KEY").ok().filter(|k| !k.trim().is_empty());
+    let agent_auth = auth::resolve(app);
     let model = choose_model(prompt);
 
     // Tool list: local tools + hosted web_search.
@@ -75,7 +151,11 @@ async fn run_loop(app: &AppHandle, prompt: &str, task_id: &str) -> AgentResultEv
     let client = reqwest::Client::new();
 
     for turn in 0..MAX_TURNS {
-        info!("[agent] turn {turn} (dev={})", dev_key.is_some());
+        info!(
+            "[agent] turn {turn} (dev={}, signed_in={})",
+            agent_auth.anthropic_key.is_some(),
+            agent_auth.jwt.is_some()
+        );
         let body = json!({
             "model": model,
             "max_tokens": 4096,
@@ -84,7 +164,7 @@ async fn run_loop(app: &AppHandle, prompt: &str, task_id: &str) -> AgentResultEv
             "messages": messages,
         });
 
-        let payload = match call_api(&client, &dev_key, &body).await {
+        let payload = match call_api(&client, &agent_auth, &body).await {
             Ok(v) => v,
             Err(e) => return fail(task_id, e),
         };
@@ -159,6 +239,29 @@ async fn run_loop(app: &AppHandle, prompt: &str, task_id: &str) -> AgentResultEv
                 AgentStepEvent { task_id: task_id.to_string(), step: step.clone() },
             );
 
+            // Human-in-the-loop (PRD principle #4): risky/destructive actions —
+            // synthetic typing and clicking — pause for the user's OK before we
+            // touch their machine. Safe reads (open_url/open_app/move_mouse/
+            // web_search) run straight through.
+            if tools::is_risky(name, input) {
+                let approved = request_confirmation(app, task_id, &step, name).await;
+                if !approved {
+                    step.status = StepStatus::Failed;
+                    step.result_snippet = Some("You cancelled this action.".into());
+                    let _ = app.emit(
+                        EVT_STEP,
+                        AgentStepEvent { task_id: task_id.to_string(), step: step.clone() },
+                    );
+                    tool_results.push(json!({
+                        "type": "tool_result",
+                        "tool_use_id": id,
+                        "content": "The user declined to run this action. Do not retry it; either continue with a different approach or wrap up.",
+                        "is_error": true,
+                    }));
+                    continue;
+                }
+            }
+
             let result = tools::dispatch(app, name, input).await;
 
             step.status = if tools::looks_like_failure(&result) {
@@ -187,18 +290,28 @@ async fn run_loop(app: &AppHandle, prompt: &str, task_id: &str) -> AgentResultEv
 /// POST one turn and return the parsed JSON body, or a user-facing error.
 async fn call_api(
     client: &reqwest::Client,
-    dev_key: &Option<String>,
+    agent_auth: &auth::AgentAuth,
     body: &Value,
 ) -> Result<Value, String> {
-    let mut req = if let Some(key) = dev_key {
+    let mut req = if let Some(key) = &agent_auth.anthropic_key {
+        // Dev escape: straight to Anthropic (parity with the Mac dev path).
         client
             .post(ANTHROPIC_ENDPOINT)
             .header("x-api-key", key)
             .header("anthropic-version", "2023-06-01")
     } else {
-        client
-            .post(AGENT_ENDPOINT)
+        // Shared backend (buffered proxy). Send the Supabase bearer when signed
+        // in so per-user quota applies; always send the device id + client tag
+        // for anonymous free-tier metering.
+        let endpoint = format!("{}{}", agent_auth.base_url, AGENT_PATH);
+        let mut r = client
+            .post(endpoint)
             .header("x-keyfloe-client", "windows")
+            .header("x-keyfloe-device-id", agent_auth.device_id.as_str());
+        if let Some(jwt) = &agent_auth.jwt {
+            r = r.header("authorization", format!("Bearer {jwt}"));
+        }
+        r
     };
     req = req.header("content-type", "application/json").json(body);
 

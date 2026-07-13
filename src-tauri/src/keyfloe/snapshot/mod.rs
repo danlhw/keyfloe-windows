@@ -26,7 +26,10 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
 // ── Backend endpoints (shared with the Mac app — do NOT rebuild) ────────────
-const KEYFLOE_CHAT_URL: &str = "https://keyfloe.com/v1/chat";
+// One base URL for the whole app: keyfloe.com/v1. When the central AuthState
+// (task P1-05) lands, `base_url()` should return `AuthState::base_url()` so a
+// single override flows everywhere.
+const KEYFLOE_BASE_URL: &str = "https://keyfloe.com/v1";
 const ANTHROPIC_DIRECT_URL: &str = "https://api.anthropic.com/v1/messages";
 
 // Vision model + budget. Haiku is what the Mac snapshot path uses (fast, cheap,
@@ -35,11 +38,22 @@ const SNAPSHOT_MODEL: &str = "claude-haiku-4-5-20251001";
 const SNAPSHOT_MAX_TOKENS: u32 = 1024;
 const JPEG_QUALITY: u8 = 80;
 
-// FE event channel names (listened to by the pill / result surface).
+// FE event channel names (listened to by the SnapshotResult fallback surface).
 pub const EVT_CHUNK: &str = "keyfloe://snapshot-chunk";
 pub const EVT_DONE: &str = "keyfloe://snapshot-done";
 pub const EVT_ERROR: &str = "keyfloe://snapshot-error";
 pub const EVT_STARTED: &str = "keyfloe://snapshot-started";
+
+// The pill is the single visual record (product principle #1). The Snapshot
+// answer is streamed into it as one iMessage-style AI bubble, updated in place
+// by a stable id (upsert-by-id). This is the PRIMARY answer surface; the four
+// `keyfloe://snapshot-*` events above still fire for the self-contained
+// `SnapshotResult` fallback until the shared pill is mounted.
+//
+// The pill host (src/keyfloe/shell/, task P1-02) owns a `pillMessageStore` that
+// listens for this event and upserts each message by `id`. It must also REVEAL
+// the pill window when a message arrives (Snapshot fires with the pill closed).
+const PILL_MSG_EVENT: &str = "pill://message";
 
 // The selection-overlay Tauri window label. The FE window at
 // `src/keyfloe/snapshot/overlay.html` is created lazily with this label.
@@ -73,6 +87,42 @@ struct SnapshotErrorPayload {
     /// can show an upgrade nudge instead of a generic error, matching the Mac
     /// `isQuotaError` handling.
     quota: bool,
+}
+
+/// One message pushed into the shared pill. Shape mirrors the FE `PillMessage`
+/// (src/keyfloe/shell/Pill.tsx): `{ id, role, text, streaming?, status? }`.
+/// Snapshot only ever emits an `ai` bubble; the same `id` is reused across the
+/// whole answer so the pill updates in place instead of appending N bubbles.
+#[derive(Debug, Clone, Serialize)]
+struct PillMessage {
+    id: String,
+    role: &'static str,
+    text: String,
+    streaming: bool,
+}
+
+/// A stable per-capture message id so every chunk updates the SAME pill bubble.
+fn new_msg_id() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    format!("snapshot-{ms}")
+}
+
+/// Upsert one AI bubble into the pill (best-effort — the pill may not be mounted
+/// yet, in which case this is a harmless no-op and `SnapshotResult` still shows).
+fn emit_pill(app: &AppHandle, id: &str, text: &str, streaming: bool) {
+    let _ = app.emit(
+        PILL_MSG_EVENT,
+        PillMessage {
+            id: id.to_string(),
+            role: "ai",
+            text: text.to_string(),
+            streaming,
+        },
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -133,13 +183,28 @@ pub async fn snapshot_capture_region(
         return Ok(());
     }
 
+    // Read the overlay's physical origin BEFORE hiding it. The marquee rect the
+    // FE sends is relative to the overlay's top-left; because the overlay is
+    // fullscreen on ONE monitor, that origin tells us which monitor to grab
+    // (multi-monitor support via `xcap::Monitor::from_point`). `outer_position`
+    // is still valid on a hidden window.
+    let overlay_origin = app
+        .get_webview_window(OVERLAY_LABEL)
+        .and_then(|w| w.outer_position().ok())
+        .map(|p| (p.x, p.y));
+
     // Make sure the overlay is gone before we grab pixels.
     if let Some(win) = app.get_webview_window(OVERLAY_LABEL) {
         let _ = win.hide();
     }
-    let _ = app.emit(EVT_STARTED, ());
 
-    let result = run_capture(&app, rect, prompt).await;
+    // Announce the capture to both surfaces: the fallback (pulse) and the pill
+    // (an empty AI bubble → typing dots while the vision model reads the image).
+    let msg_id = new_msg_id();
+    let _ = app.emit(EVT_STARTED, ());
+    emit_pill(&app, &msg_id, "", true);
+
+    let result = run_capture(&app, rect, prompt, overlay_origin, &msg_id).await;
     CAPTURE_IN_FLIGHT.store(false, Ordering::SeqCst);
 
     if let Err(err) = result {
@@ -151,6 +216,8 @@ pub async fn snapshot_capture_region(
                 quota,
             },
         );
+        // Land the failure in the pill too so the single record stays complete.
+        emit_pill(&app, &msg_id, &err.message, false);
         return Err(err.message);
     }
     Ok(())
@@ -242,13 +309,23 @@ async fn run_capture(
     app: &AppHandle,
     rect: SelectionRect,
     prompt: Option<String>,
+    overlay_origin: Option<(i32, i32)>,
+    msg_id: &str,
 ) -> Result<(), RunError> {
-    // 1. Screenshot the target monitor and crop to the marquee (blocking —
-    //    `xcap` is synchronous, so run it off the async runtime).
-    let jpeg = tauri::async_runtime::spawn_blocking(move || capture_region_jpeg(&rect))
-        .await
-        .map_err(|e| RunError::msg(format!("capture task panicked: {e}")))?
-        .map_err(RunError::msg)?;
+    // Give the compositor a beat to actually paint the overlay OUT before we
+    // grab pixels, otherwise the dim wash / marquee can still be in the shot.
+    // Mirrors the Mac `finish()` 60 ms defer (SnipController.swift); Windows
+    // DWM occasionally needs a touch more, so 90 ms. Verify on Windows (§V-20).
+    tokio::time::sleep(std::time::Duration::from_millis(90)).await;
+
+    // 1. Screenshot the target monitor's region (blocking — `xcap` is
+    //    synchronous, so run it off the async runtime).
+    let jpeg = tauri::async_runtime::spawn_blocking(move || {
+        capture_region_jpeg(&rect, overlay_origin)
+    })
+    .await
+    .map_err(|e| RunError::msg(format!("capture task panicked: {e}")))?
+    .map_err(RunError::msg)?;
 
     // 2. Stream the vision answer into the pill.
     let user_prompt = prompt
@@ -256,7 +333,7 @@ async fn run_capture(
         .filter(|p| !p.is_empty())
         .unwrap_or_else(|| DEFAULT_PROMPT.to_string());
 
-    stream_vision_answer(app, jpeg, user_prompt).await
+    stream_vision_answer(app, jpeg, user_prompt, msg_id).await
 }
 
 const DEFAULT_PROMPT: &str = "Answer or explain what's in this screenshot. If it \
@@ -272,11 +349,28 @@ help with the email/UI shown. Be concise — you are shown in a small pill, not 
 document. Never ask the user to restate what's already visible; you ARE the \
 answer.";
 
-/// Capture the given monitor and crop it to `rect` (physical pixels), returning
-/// JPEG bytes. `xcap` is cross-platform (Apache-2.0); it compiles on macOS for
-/// `cargo check` but the real target is Windows.
-fn capture_region_jpeg(rect: &SelectionRect) -> Result<Vec<u8>, String> {
-    use image::{codecs::jpeg::JpegEncoder, RgbaImage};
+/// Screenshot exactly the marquee region and return JPEG bytes.
+///
+/// Monitor selection (in priority order):
+///   1. an explicit `rect.monitor` index into `xcap::Monitor::all()` (if the FE
+///      ever passes one),
+///   2. the monitor under the overlay's own origin — `Monitor::from_point` —
+///      so selecting on a SECONDARY display captures that display, not the
+///      primary (the overlay is fullscreen on one monitor, so `rect` is already
+///      that monitor's local coordinate space),
+///   3. the primary monitor, else the first.
+///
+/// The rect is in **physical** pixels relative to the chosen monitor's
+/// top-left (the FE multiplies its CSS drag by `devicePixelRatio`), which is
+/// exactly what `capture_region` expects — so 100/125/150/200 % HiDPI maps 1:1.
+///
+/// `xcap` is cross-platform (Apache-2.0); this compiles on macOS for
+/// `cargo check` but the real capture is only verifiable on Windows (§V-20).
+fn capture_region_jpeg(
+    rect: &SelectionRect,
+    overlay_origin: Option<(i32, i32)>,
+) -> Result<Vec<u8>, String> {
+    use image::codecs::jpeg::JpegEncoder;
     use xcap::Monitor;
 
     let monitors = Monitor::all().map_err(|e| format!("xcap monitor enumeration failed: {e}"))?;
@@ -284,43 +378,59 @@ fn capture_region_jpeg(rect: &SelectionRect) -> Result<Vec<u8>, String> {
         return Err("no monitors found".into());
     }
 
-    // Pick the requested monitor, else the primary, else the first.
-    let monitor = match rect.monitor {
-        Some(i) => monitors.get(i).or_else(|| monitors.first()),
-        None => monitors
-            .iter()
-            .find(|m| m.is_primary().unwrap_or(false))
-            .or_else(|| monitors.first()),
-    }
-    .ok_or_else(|| "no usable monitor".to_string())?;
+    // 1 / 2 / 3 — resolve the monitor to capture.
+    let monitor = if let Some(i) = rect.monitor {
+        monitors.into_iter().nth(i).ok_or_else(|| {
+            format!("monitor index {i} out of range")
+        })?
+    } else if let Some((ox, oy)) = overlay_origin {
+        // Nudge one pixel inward so the origin is unambiguously ON the monitor.
+        Monitor::from_point(ox + 1, oy + 1)
+            .or_else(|_| pick_primary(Monitor::all()))
+            .map_err(|e| format!("could not resolve target monitor: {e}"))?
+    } else {
+        pick_primary(Monitor::all()).map_err(|e| format!("no usable monitor: {e}"))?
+    };
 
-    let shot: RgbaImage = monitor
-        .capture_image()
-        .map_err(|e| format!("screen capture failed: {e}"))?;
-
-    let (img_w, img_h) = (shot.width(), shot.height());
-
-    // Clamp the marquee to the captured image bounds so a slightly-oversized
-    // selection (or a HiDPI rounding overshoot) can't panic the crop.
+    // Clamp the marquee to the monitor's physical bounds so a HiDPI rounding
+    // overshoot (or a drag that ran off the edge) can't error the capture.
+    let mon_w = monitor.width().unwrap_or(u32::MAX);
+    let mon_h = monitor.height().unwrap_or(u32::MAX);
     let x0 = rect.x.max(0) as u32;
     let y0 = rect.y.max(0) as u32;
-    if x0 >= img_w || y0 >= img_h {
+    if x0 >= mon_w || y0 >= mon_h {
         return Err("selection is outside the captured monitor".into());
     }
-    let w = rect.width.min(img_w.saturating_sub(x0)).max(1);
-    let h = rect.height.min(img_h.saturating_sub(y0)).max(1);
+    let w = rect.width.min(mon_w.saturating_sub(x0)).max(1);
+    let h = rect.height.min(mon_h.saturating_sub(y0)).max(1);
 
-    // Crop (copy the sub-rectangle into a fresh buffer).
-    let cropped = image::imageops::crop_imm(&shot, x0, y0, w, h).to_image();
+    // Grab ONLY the region (cheaper than full-screen + crop).
+    let region = monitor
+        .capture_region(x0, y0, w, h)
+        .map_err(|e| format!("screen region capture failed: {e}"))?;
 
-    // JPEG-encode. Anthropic wants RGB; drop the alpha channel. RgbImage
-    // implements GenericImageView, so encode it directly.
-    let rgb = image::DynamicImage::ImageRgba8(cropped).to_rgb8();
+    // JPEG-encode. Anthropic wants RGB; drop the alpha channel.
+    let rgb = image::DynamicImage::ImageRgba8(region).to_rgb8();
     let mut out: Vec<u8> = Vec::new();
     JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY)
         .encode_image(&rgb)
         .map_err(|e| format!("jpeg encode failed: {e}"))?;
     Ok(out)
+}
+
+/// Pick the primary monitor (else the first) from an `xcap` enumeration.
+fn pick_primary(
+    all: xcap::XCapResult<Vec<xcap::Monitor>>,
+) -> xcap::XCapResult<xcap::Monitor> {
+    let monitors = all?;
+    let primary = monitors
+        .iter()
+        .position(|m| m.is_primary().unwrap_or(false))
+        .unwrap_or(0);
+    monitors
+        .into_iter()
+        .nth(primary)
+        .ok_or_else(|| xcap::XCapError::new("no monitors found"))
 }
 
 /// Build the Anthropic Messages body (vision) and stream the answer, emitting
@@ -331,6 +441,7 @@ async fn stream_vision_answer(
     app: &AppHandle,
     jpeg: Vec<u8>,
     user_prompt: String,
+    msg_id: &str,
 ) -> Result<(), RunError> {
     use base64::{engine::general_purpose::STANDARD, Engine as _};
     use futures_util::StreamExt;
@@ -370,7 +481,7 @@ async fn stream_vision_answer(
             .header("anthropic-version", "2023-06-01")
     } else {
         let mut req = client
-            .post(KEYFLOE_CHAT_URL)
+            .post(chat_url())
             .header("content-type", "application/json")
             .header("x-oneclick-feature", "snapshot");
         // Auth: attach the Supabase JWT when the shell/auth agent wires one up.
@@ -424,6 +535,7 @@ async fn stream_vision_answer(
             };
             if payload == "[DONE]" {
                 let _ = app.emit(EVT_DONE, running.clone());
+                emit_pill(app, msg_id, &running, false);
                 return Ok(());
             }
             let Ok(obj) = serde_json::from_str::<serde_json::Value>(payload) else {
@@ -439,11 +551,13 @@ async fn stream_vision_answer(
                         if !text.is_empty() {
                             running.push_str(text);
                             let _ = app.emit(EVT_CHUNK, running.clone());
+                            emit_pill(app, msg_id, &running, true);
                         }
                     }
                 }
                 Some("message_stop") => {
                     let _ = app.emit(EVT_DONE, running.clone());
+                    emit_pill(app, msg_id, &running, false);
                     return Ok(());
                 }
                 Some("error") => {
@@ -461,6 +575,7 @@ async fn stream_vision_answer(
     }
 
     // Stream ended without an explicit stop marker — deliver what we have.
+    emit_pill(app, msg_id, &running, false);
     let _ = app.emit(EVT_DONE, running);
     Ok(())
 }
@@ -469,17 +584,32 @@ async fn stream_vision_answer(
 // Auth hooks (thin — filled in when the shell/auth agent lands)
 // ─────────────────────────────────────────────────────────────────────────
 
-/// Return the Supabase JWT for the worker path, if available. The auth agent
-/// should replace this body with a real lookup (e.g. from a shared AuthState
-/// managed in lib.rs). For now: env override for local testing, else None
-/// (worker free-tier by device id still answers).
+/// The `/v1/chat` endpoint, derived from the single base URL.
+fn chat_url() -> String {
+    format!("{KEYFLOE_BASE_URL}/chat")
+}
+
+// ── Central-auth integration point (task P1-05) ─────────────────────────────
+// These three functions are the ONLY place snapshot resolves auth. Once the
+// auth agent lands `crate::keyfloe::auth::AuthState` (managed in lib.rs with
+// `get_jwt()` / `get_device_id()` / `base_url()`), swap the three bodies to:
+//
+//     let s = app.state::<crate::keyfloe::auth::AuthState>();
+//     // auth_bearer:  s.get_jwt()
+//     // device_id:    s.get_device_id()
+//     // base:         KEYFLOE_BASE_URL -> s.base_url()
+//
+// Kept env-based for now so this feature compiles + runs in isolation (the
+// worker's free-tier device-id path still answers without a JWT).
+
+/// Return the Supabase JWT for the worker path, if available.
 fn auth_bearer(_app: &AppHandle) -> Option<String> {
     std::env::var("KEYFLOE_JWT").ok().filter(|s| !s.is_empty())
 }
 
-/// Stable per-install device id used by the worker's free-tier quota. The shell
-/// agent already needs one for dictation/agent; this reads the same env var as
-/// a placeholder until that shared id exists.
+/// Stable per-install device id used by the worker's free-tier quota.
 fn device_id(_app: &AppHandle) -> Option<String> {
-    std::env::var("KEYFLOE_DEVICE_ID").ok().filter(|s| !s.is_empty())
+    std::env::var("KEYFLOE_DEVICE_ID")
+        .ok()
+        .filter(|s| !s.is_empty())
 }

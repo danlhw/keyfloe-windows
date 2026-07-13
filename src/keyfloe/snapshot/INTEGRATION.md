@@ -114,26 +114,32 @@ press — `start` on key-down is enough; the overlay itself is the modal step).
 `src/keyfloe/snapshot/useSnapshot.ts` anywhere in the shell (e.g. a "Snapshot"
 button), which `invoke("snapshot_begin")`.
 
-## 7. Result in the pill
+## 7. Result in the pill (PRIMARY surface)
 
-The pill is the single visual log; the answer should render there. Wire it with
-the hook (no shared-file edits needed beyond mounting it):
+The pill is the single visual log; the answer renders there with **no FE glue** —
+`mod.rs` streams it straight into the pill by emitting `pill://message` events
+(one AI bubble, upserted by a stable `id` across the whole answer). The pill
+host (`src/keyfloe/shell/`, task P1-02) must:
 
-```tsx
-import { useSnapshot } from "@/keyfloe/snapshot/useSnapshot";
-// inside the pill component:
-const snap = useSnapshot(); // { status, answer, error, quota }
-// render snap.answer as the streaming assistant turn.
-```
+- have its `pillMessageStore` **upsert** an incoming `pill://message` by `id`
+  (replace the same bubble, don't append N bubbles), and
+- **reveal** the pill window when a message arrives (Snapshot fires with the
+  pill closed).
 
-Until the shared pill exists, `SnapshotResult.tsx` is a drop-in self-contained
-surface that renders the streamed answer (mount it anywhere; it renders nothing
-while idle).
+Payload matches the FE `PillMessage` shape (`Pill.tsx`):
+`{ id: string, role: "ai", text: string, streaming: boolean }`.
+
+**Fallback:** for any view where the pill isn't mounted, `SnapshotResult.tsx` is
+a drop-in branded card (kf-glass + AI bubble + Copy button) driven by
+`useSnapshot()`. Mount it anywhere; it renders nothing while idle. It is fed by
+the four `keyfloe://snapshot-*` events below, which still fire alongside the
+pill feed.
 
 ### Backend → FE events (already emitted by `mod.rs`)
 
 | Event                          | Payload                       | Meaning                    |
 | ------------------------------ | ----------------------------- | -------------------------- |
+| `pill://message`               | `PillMessage` (see above)     | PRIMARY: renders in pill   |
 | `keyfloe://snapshot-started`   | `()`                          | capture began (pulse)      |
 | `keyfloe://snapshot-chunk`     | `string` (full running text)  | streaming answer           |
 | `keyfloe://snapshot-done`      | `string` (final text)         | finished                   |
@@ -150,11 +156,14 @@ Uses the shared backend, no rebuild:
 - Dev: set `ANTHROPIC_API_KEY` in the env → goes straight to
   `api.anthropic.com` (bypasses the worker, for local testing).
 
-**Auth is stubbed.** `auth_bearer()` / `device_id()` in `mod.rs` currently read
-`KEYFLOE_JWT` / `KEYFLOE_DEVICE_ID` env vars as placeholders. When the
-shell/auth agent lands a shared Supabase JWT + device-id (needed by dictation +
-agent too), replace those two functions to read from that shared state. Until
-then the worker's free-tier (device-id) path still answers.
+**Auth → central AuthState (task P1-05).** `mod.rs` resolves auth in exactly
+three tiny functions — `auth_bearer()`, `device_id()`, and `chat_url()` (base
+`KEYFLOE_BASE_URL = https://keyfloe.com/v1`). They read `KEYFLOE_JWT` /
+`KEYFLOE_DEVICE_ID` env vars today so the feature compiles + runs in isolation
+(worker free-tier by device-id still answers). Once the auth agent lands
+`crate::keyfloe::auth::AuthState` (managed in `lib.rs`, exposing `get_jwt()` /
+`get_device_id()` / `base_url()`), swap those three bodies to read from
+`app.state::<AuthState>()`. That is the ONLY auth edit this feature needs.
 
 ---
 

@@ -58,12 +58,30 @@ export const ActionBadge: React.FC<{
   if (!resolved) return null;
   const { Icon, label } = resolved;
   return (
-    <div className="flex items-center gap-1 min-w-0">
-      <span className="text-[9px] uppercase tracking-wide text-mid-gray shrink-0">
+    <div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}>
+      <span
+        style={{
+          fontSize: 9,
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+          color: "var(--kf-ink-400)",
+          flexShrink: 0,
+        }}
+      >
         {gestureLabel}
       </span>
-      <Icon size={11} className="shrink-0 text-logo-primary" />
-      <span className="truncate text-[10px] text-text/80">{label}</span>
+      <Icon size={11} style={{ flexShrink: 0, color: "var(--kf-gold)" }} />
+      <span
+        style={{
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          fontSize: 10,
+          color: "var(--kf-ink-900)",
+        }}
+      >
+        {label}
+      </span>
     </div>
   );
 };

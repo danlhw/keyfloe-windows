@@ -2,10 +2,20 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capabilities for the app",
-  "windows": ["main", "recording_overlay"],
+  "windows": [
+    "main",
+    "recording_overlay",
+    "pill",
+    "snapshot_overlay",
+    "interview_overlay"
+  ],
   "permissions": [
     "core:default",
     "opener:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://*" }, { "url": "http://*" }]
+    },
     "store:default",
     "updater:default",
     "process:default",

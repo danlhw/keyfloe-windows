@@ -1,0 +1,160 @@
+/* Interview dashboard body — session control card + context editor.
+   Uses the shared kf- design tokens (keyfloe.css); theme-aware by inheritance. */
+
+.kf-iv-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.kf-ivtab-card {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kf-ivtab-card-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.kf-ivtab-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.kf-ivtab-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex: none;
+  background: var(--kf-ink-400);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+.kf-ivtab-dot[data-on="true"] {
+  background: var(--kf-green);
+  box-shadow: 0 0 0 4px rgba(58, 209, 122, 0.18);
+  animation: kf-ivtab-pulse 1.6s ease-in-out infinite;
+}
+@keyframes kf-ivtab-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgba(58, 209, 122, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(58, 209, 122, 0.05);
+  }
+}
+
+.kf-ivtab-status-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.kf-ivtab-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--kf-ink-900);
+}
+.kf-ivtab-sub {
+  font-size: 12.5px;
+  line-height: 1.5;
+  max-width: 52ch;
+}
+
+.kf-ivtab-btn {
+  flex: none;
+  white-space: nowrap;
+}
+/* Stop = destructive; use the brand red rather than gold. */
+.kf-ivtab-btn-stop {
+  background: var(--kf-red);
+  color: #fff;
+  border-color: transparent;
+}
+.kf-ivtab-btn-stop:hover {
+  filter: brightness(1.05);
+}
+
+.kf-ivtab-live {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--kf-hairline);
+}
+.kf-ivtab-live-label {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+.kf-ivtab-spacer {
+  flex: 1;
+}
+.kf-ivtab-mic-only {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--kf-gold);
+  border: 1px solid var(--kf-gold);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.kf-ivtab-overlay-link {
+  background: none;
+  border: none;
+  color: var(--kf-blue);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.kf-ivtab-overlay-link:hover {
+  text-decoration: underline;
+}
+
+.kf-ivtab-wave {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+  width: 96px;
+}
+.kf-ivtab-wave > span {
+  flex: 1;
+  min-height: 2px;
+  border-radius: 2px;
+  background: var(--kf-green);
+  transition: height 0.09s linear;
+}
+
+.kf-ivtab-banner {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--kf-ink-900);
+  background: rgba(214, 150, 70, 0.12);
+  border: 1px solid rgba(214, 150, 70, 0.4);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.kf-ivtab-hint {
+  font-size: 11.5px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+@media (max-width: 620px) {
+  .kf-ivtab-card-main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .kf-ivtab-btn {
+    width: 100%;
+  }
+}

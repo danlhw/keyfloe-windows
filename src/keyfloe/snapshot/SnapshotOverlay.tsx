@@ -114,6 +114,7 @@ export function SnapshotOverlay() {
 
   return (
     <div
+      className="kf-root"
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
       onMouseUp={onMouseUp}
@@ -152,7 +153,8 @@ export function SnapshotOverlay() {
               rect!.h,
             )}
           />
-          {/* Marquee border: dark base + white dashes → visible on any bg. */}
+          {/* Marquee border: dark base + white dashes stay visible on any
+              background; a soft gold ring makes the selection read as Keyfloe. */}
           <div
             style={{
               position: "fixed",
@@ -164,13 +166,40 @@ export function SnapshotOverlay() {
               border: "1.5px solid rgba(0,0,0,0.55)",
               outline: "1.5px dashed #fff",
               outlineOffset: "-1.5px",
+              boxShadow: "0 0 0 1px rgba(214,150,70,0.55), 0 0 14px rgba(214,150,70,0.35)",
               pointerEvents: "none",
             }}
           />
+
+          {/* Size readout (PRD 5.3) — device-independent CSS px, pinned just
+              below the box, or above it when the box hugs the bottom edge. */}
+          <div
+            style={{
+              position: "fixed",
+              left: rect!.x,
+              top:
+                rect!.y + rect!.h + 26 > window.innerHeight
+                  ? Math.max(rect!.y - 24, 4)
+                  : rect!.y + rect!.h + 6,
+              padding: "3px 8px",
+              borderRadius: 7,
+              background: "rgba(11,11,13,0.82)",
+              color: "#f5f1ea",
+              fontFamily: "var(--kf-font-mono), ui-monospace, monospace",
+              fontSize: 11,
+              letterSpacing: "0.04em",
+              pointerEvents: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {Math.round(rect!.w)} × {Math.round(rect!.h)}
+          </div>
         </>
       )}
 
-      {/* Hint chip — only before the first drag. */}
+      {/* Hint chip — only before the first drag. Fixed dark treatment (it floats
+          over the user's screen, not an app surface) with the brand font + gold
+          status dot. */}
       {!hasSelection && (
         <div
           style={{
@@ -178,18 +207,32 @@ export function SnapshotOverlay() {
             top: 24,
             left: "50%",
             transform: "translateX(-50%)",
-            padding: "8px 14px",
-            borderRadius: 10,
-            background: "rgba(20,20,22,0.72)",
-            color: "#fff",
-            fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 9,
+            padding: "9px 15px",
+            borderRadius: 999,
+            background: "rgba(11,11,13,0.74)",
+            border: "1px solid rgba(214,150,70,0.30)",
+            color: "#f5f1ea",
+            fontFamily: "var(--kf-font-sans), -apple-system, 'Segoe UI', sans-serif",
             fontSize: 13,
             fontWeight: 500,
-            letterSpacing: 0.2,
+            letterSpacing: "0.01em",
             pointerEvents: "none",
             backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
           }}
         >
+          <span
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              background: "#d69646",
+              boxShadow: "0 0 8px #d69646",
+            }}
+          />
           Drag a box over anything to ask Keyfloe · Esc to cancel
         </div>
       )}

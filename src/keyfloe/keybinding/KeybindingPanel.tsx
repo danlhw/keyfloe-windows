@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { RotateCcw, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/Button";
 import { useKeybindings } from "./useKeybindings";
 import { KeyboardView } from "./components/KeyboardView";
 import { AssignSheet } from "./components/AssignSheet";
@@ -9,8 +8,10 @@ import { CustomFeaturesManager } from "./components/CustomFeaturesManager";
 /**
  * Top-level tab for Feature F — the customizable keyboard.
  *
- * Wire into the sidebar/routing per INTEGRATION.md (App.tsx is not edited by
- * this feature). Exported from `src/keyfloe/keybinding/index.ts`.
+ * Branded on the kf design tokens (kf-glass / kf-eyebrow / kf-display / kf-btn)
+ * and sourced ENTIRELY from the backend (`useKeybindings` -> keybinding_get_config)
+ * so rows reflect the user's actual persisted bindings. Wire into the sidebar
+ * per INTEGRATION.md (App.tsx is not edited by this feature).
  */
 export const KeybindingPanel: React.FC = () => {
   const { config, loading, error, load, resetAll } = useKeybindings();
@@ -23,11 +24,15 @@ export const KeybindingPanel: React.FC = () => {
   }, [load]);
 
   if (loading && !config) {
-    return <div className="p-6 text-sm text-mid-gray">Loading keyboard…</div>;
+    return (
+      <div style={{ padding: 24, fontSize: 14, color: "var(--kf-ink-600)" }}>
+        Loading keyboard…
+      </div>
+    );
   }
   if (error && !config) {
     return (
-      <div className="p-6 text-sm text-red-400">
+      <div style={{ padding: 24, fontSize: 14, color: "var(--kf-red)" }}>
         Failed to load keybindings: {error}
       </div>
     );
@@ -35,32 +40,68 @@ export const KeybindingPanel: React.FC = () => {
   if (!config) return null;
 
   return (
-    <div className="flex flex-col gap-4 p-6">
-      <div className="flex items-start justify-between gap-4">
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        padding: 24,
+        fontFamily: "var(--kf-font-sans)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 16,
+        }}
+      >
         <div>
-          <h2 className="text-lg font-bold text-text">Your keyboard</h2>
-          <p className="text-sm text-mid-gray max-w-lg">
+          <div className="kf-eyebrow">Cursor &amp; Keys</div>
+          <h2
+            style={{
+              fontFamily: "var(--kf-font-sans)",
+              fontSize: 20,
+              fontWeight: 600,
+              color: "var(--kf-ink-900)",
+              margin: "2px 0 0",
+            }}
+          >
+            Your keyboard
+          </h2>
+          <p
+            style={{
+              fontSize: 14,
+              color: "var(--kf-ink-600)",
+              maxWidth: 520,
+              margin: "4px 0 0",
+            }}
+          >
             Click any glowing key to change what it does. Tap fires on a quick
-            press; hold activates while you hold it down.
+            press. Hold activates while you hold it down.
           </p>
         </div>
-        <div className="flex gap-2 shrink-0">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="inline-flex items-center gap-1"
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          <button
+            className="kf-btn kf-btn-secondary"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             onClick={() => setShowCustom(true)}
           >
             <Sparkles size={14} /> Your features
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="inline-flex items-center gap-1"
+          </button>
+          <button
+            className="kf-btn kf-btn-secondary"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: "transparent",
+            }}
             onClick={() => setConfirmReset(true)}
           >
             <RotateCcw size={14} /> Reset all
-          </Button>
+          </button>
         </div>
       </div>
 
@@ -70,17 +111,14 @@ export const KeybindingPanel: React.FC = () => {
         onSelectKey={setSelectedKey}
       />
 
-      <p className="text-xs text-mid-gray">
-        Bound keys are fully repurposed by Keyfloe — a key you assign no longer
+      <p style={{ fontSize: 12, color: "var(--kf-ink-600)" }}>
+        Bound keys are fully repurposed by Keyfloe. A key you assign no longer
         performs its normal Windows function. Caps Lock and the right-side
         modifier keys are the safest to reassign.
       </p>
 
       {selectedKey && (
-        <AssignSheet
-          keyId={selectedKey}
-          onClose={() => setSelectedKey(null)}
-        />
+        <AssignSheet keyId={selectedKey} onClose={() => setSelectedKey(null)} />
       )}
       {showCustom && (
         <CustomFeaturesManager onClose={() => setShowCustom(false)} />
@@ -103,20 +141,53 @@ const ResetConfirm: React.FC<{
   onCancel: () => void;
   onConfirm: () => void;
 }> = ({ onCancel, onConfirm }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-    <div className="rounded-xl border border-mid-gray/20 bg-background p-5 max-w-sm">
-      <h3 className="text-base font-bold text-text">Reset every key?</h3>
-      <p className="mt-1 text-sm text-mid-gray">
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 50,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "rgba(0,0,0,0.5)",
+    }}
+  >
+    <div
+      className="kf-glass"
+      style={{ borderRadius: 14, padding: 20, maxWidth: 360 }}
+    >
+      <h3
+        style={{
+          fontSize: 16,
+          fontWeight: 600,
+          color: "var(--kf-ink-900)",
+          margin: 0,
+        }}
+      >
+        Reset every key?
+      </h3>
+      <p style={{ marginTop: 4, fontSize: 14, color: "var(--kf-ink-600)" }}>
         This restores all keys to their default features. Your custom features
         are kept.
       </p>
-      <div className="mt-4 flex justify-end gap-2">
-        <Button size="sm" variant="secondary" onClick={onCancel}>
+      <div
+        style={{
+          marginTop: 16,
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 8,
+        }}
+      >
+        <button className="kf-btn kf-btn-secondary" onClick={onCancel}>
           Cancel
-        </Button>
-        <Button size="sm" variant="danger" onClick={onConfirm}>
+        </button>
+        <button
+          className="kf-btn kf-btn-primary"
+          style={{ background: "var(--kf-red)", color: "#fff" }}
+          onClick={onConfirm}
+        >
           Reset all
-        </Button>
+        </button>
       </div>
     </div>
   </div>

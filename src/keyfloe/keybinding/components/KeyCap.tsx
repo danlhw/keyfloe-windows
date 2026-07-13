@@ -14,6 +14,12 @@ interface KeyCapProps {
 const UNIT = 46; // px per width unit
 const GAP = 6;
 
+/**
+ * One key cap on the interactive keyboard, branded on the kf design tokens.
+ * Bound keys are gold-lit (var(--kf-gold)) with a soft travelling glow; the
+ * selected key gets a solid gold ring — mirrors the Mac KeyboardView + the
+ * shell KeyfloeKeyboard's gold-lit keys rather than the old cream Tailwind glow.
+ */
 export const KeyCap: React.FC<KeyCapProps> = ({
   def,
   binding,
@@ -25,31 +31,70 @@ export const KeyCap: React.FC<KeyCapProps> = ({
   const bound = !!(binding && (binding.tap || binding.hold));
   const assignable = !!def.assignable;
 
-  const base =
-    "relative flex flex-col justify-between rounded-md border text-left select-none transition-colors overflow-hidden";
-  const state = !assignable
-    ? "bg-mid-gray/5 border-mid-gray/10 text-mid-gray/60"
-    : selected
-      ? "bg-logo-primary/25 border-logo-primary text-text shadow-[0_0_0_2px_var(--color-logo-primary)] cursor-pointer"
-      : bound
-        ? "bg-logo-primary/10 border-logo-primary/70 text-text hover:bg-logo-primary/20 cursor-pointer keyfloe-key-glow"
-        : "bg-mid-gray/10 border-mid-gray/30 text-text hover:border-logo-primary hover:bg-logo-primary/10 cursor-pointer";
+  const style: React.CSSProperties = {
+    width,
+    height: assignable ? 58 : 46,
+    padding: "5px 7px",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: "solid",
+    fontFamily: "var(--kf-font-sans)",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    textAlign: "left",
+    userSelect: "none",
+    overflow: "hidden",
+    transition: "border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease",
+  };
+
+  if (!assignable) {
+    Object.assign(style, {
+      background: "var(--kf-panel-fill)",
+      borderColor: "var(--kf-hairline)",
+      color: "var(--kf-ink-400)",
+      cursor: "default",
+    });
+  } else if (selected) {
+    Object.assign(style, {
+      background: "color-mix(in srgb, var(--kf-gold) 22%, transparent)",
+      borderColor: "var(--kf-gold)",
+      color: "var(--kf-ink-900)",
+      boxShadow: "0 0 0 2px var(--kf-gold)",
+      cursor: "pointer",
+    });
+  } else if (bound) {
+    Object.assign(style, {
+      background: "color-mix(in srgb, var(--kf-gold) 12%, transparent)",
+      borderColor: "color-mix(in srgb, var(--kf-gold) 65%, transparent)",
+      color: "var(--kf-ink-900)",
+      cursor: "pointer",
+      boxShadow: "0 0 10px 1px color-mix(in srgb, var(--kf-gold) 40%, transparent)",
+    });
+  } else {
+    Object.assign(style, {
+      background: "var(--kf-panel-fill)",
+      borderColor: "var(--kf-panel-border)",
+      color: "var(--kf-ink-900)",
+      cursor: "pointer",
+    });
+  }
 
   return (
     <button
       type="button"
-      className={`${base} ${state}`}
-      style={{ width, height: assignable ? 58 : 46, padding: "5px 7px" }}
+      className={bound && !selected ? "keyfloe-key-glow" : undefined}
+      style={style}
       disabled={!assignable}
       aria-pressed={selected}
       onClick={() => assignable && onSelect(def.id)}
       title={assignable ? "Click to assign a feature" : undefined}
     >
-      <span className="text-[11px] font-semibold leading-none">
+      <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1 }}>
         {def.label}
       </span>
       {assignable && (
-        <div className="flex flex-col gap-0.5 w-full">
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
           {binding?.tap && (
             <ActionBadge
               action={binding.tap}
@@ -65,7 +110,9 @@ export const KeyCap: React.FC<KeyCapProps> = ({
             />
           )}
           {!bound && (
-            <span className="text-[9px] text-mid-gray/70">unassigned</span>
+            <span style={{ fontSize: 9, color: "var(--kf-ink-400)" }}>
+              unassigned
+            </span>
           )}
         </div>
       )}

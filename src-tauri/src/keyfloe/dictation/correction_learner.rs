@@ -69,17 +69,72 @@ pub fn arm(app: &AppHandle, pasted: &str) {
     });
 }
 
-/// Read the text of the currently-focused control, if readable. Windows-only;
-/// see the module doc for why this is currently a safe stub.
+/// Read the text of the currently-focused control, if readable, via Win32 UI
+/// Automation. Windows-only. Runs on the detached watcher thread (see [`arm`]),
+/// so it initializes COM for that thread itself.
+///
+/// Read-only by construction: it Queries the focused element's ValuePattern
+/// (standard edit controls) and, failing that, its TextPattern document range
+/// (rich-edit / document controls). It NEVER writes — so it can only ever feed
+/// the vocabulary learner, never mutate the user's text (fail-safe invariant).
+///
+/// Requires the windows-crate feature `Win32_UI_Accessibility` (already enabled
+/// in `Cargo.toml`). CANNOT be exercised on this Mac dev box — see the Windows
+/// verification checklist in INTEGRATION.md.
 #[cfg(windows)]
 fn focused_field_text() -> Option<String> {
-    // TODO(windows-verify): implement with either
-    //   (a) UI Automation: IUIAutomation::GetFocusedElement + CurrentValue
-    //       (needs Cargo feature `Win32_UI_Accessibility`), or
-    //   (b) GetGUIThreadInfo(focus HWND) + SendMessageTimeoutW(WM_GETTEXT)
-    //       (needs `Win32_UI_WindowsAndMessaging` GUITHREADINFO + messages).
-    // Until wired up, return None so the learner safely no-ops (fail-safe).
-    None
+    use windows::core::Interface;
+    use windows::Win32::System::Com::{
+        CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED,
+    };
+    use windows::Win32::UI::Accessibility::{
+        CUIAutomation, IUIAutomation, IUIAutomationTextPattern, IUIAutomationValuePattern,
+        UIA_TextPatternId, UIA_ValuePatternId,
+    };
+
+    unsafe {
+        // Initialize COM for THIS (detached) worker thread. If the process/thread
+        // already initialized it this is a benign no-op; we deliberately do not
+        // `CoUninitialize` because the thread exits right after this call.
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+
+        let automation: IUIAutomation =
+            CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER).ok()?;
+        // windows-rs guarantees a non-null element on `Ok`, so the `.cast()`s
+        // below can't deref null (unsupported patterns return `Err`).
+        let element = automation.GetFocusedElement().ok()?;
+
+        // 1) ValuePattern — the common case (single/multi-line Edit controls,
+        //    most native + Chromium/WebView2 text inputs expose it).
+        if let Ok(unknown) = element.GetCurrentPattern(UIA_ValuePatternId) {
+            if let Ok(vp) = unknown.cast::<IUIAutomationValuePattern>() {
+                if let Ok(bstr) = vp.CurrentValue() {
+                    let s = bstr.to_string();
+                    if !s.trim().is_empty() {
+                        return Some(s);
+                    }
+                }
+            }
+        }
+
+        // 2) TextPattern — rich-edit / document controls (Word, code editors,
+        //    some web contenteditables). `DocumentRange().GetText(-1)` returns
+        //    the whole document text.
+        if let Ok(unknown) = element.GetCurrentPattern(UIA_TextPatternId) {
+            if let Ok(tp) = unknown.cast::<IUIAutomationTextPattern>() {
+                if let Ok(range) = tp.DocumentRange() {
+                    if let Ok(bstr) = range.GetText(-1) {
+                        let s = bstr.to_string();
+                        if !s.trim().is_empty() {
+                            return Some(s);
+                        }
+                    }
+                }
+            }
+        }
+
+        None
+    }
 }
 
 #[cfg(not(windows))]

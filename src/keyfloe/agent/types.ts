@@ -56,11 +56,29 @@ export interface VoiceCommandEvent {
   transcript: string;
 }
 
+export interface AgentListeningEvent {
+  listening: boolean;
+}
+
+/** A risky step (type_text / click) awaiting the user's Allow / Cancel. */
+export interface AgentConfirmEvent {
+  taskId: string;
+  stepId: string;
+  tool: string;
+  title: string;
+  detail: string;
+}
+
+/** What the pill tracks while a confirmation prompt is open. */
+export type PendingConfirmation = AgentConfirmEvent;
+
 // Tauri event names — keep in sync with `session.rs` / `commands.rs`.
 export const EVT_STARTED = "keyfloe://agent/started";
 export const EVT_STEP = "keyfloe://agent/step";
 export const EVT_RESULT = "keyfloe://agent/result";
 export const EVT_VOICE = "keyfloe://agent/voice-command";
+export const EVT_LISTENING = "keyfloe://agent/listening";
+export const EVT_CONFIRM = "keyfloe://agent/confirm";
 
 // A run as the UI tracks it: the started metadata + its accumulating steps +
 // (once finished) its result.

@@ -22,16 +22,46 @@ export const AgentPill: React.FC = () => {
   const listening = useAgentStore((s) => s.listening);
   const heard = useAgentStore((s) => s.heardTranscript);
   const runCommand = useAgentStore((s) => s.runCommand);
+  const pending = useAgentStore((s) => s.pendingConfirmation);
+  const respondConfirmation = useAgentStore((s) => s.respondConfirmation);
   const init = useAgentStore((s) => s.init);
 
   useEffect(() => {
     init();
   }, [init]);
 
+  const confirmBlock = pending ? (
+    <div className="ag-confirm">
+      <div className="ag-confirm-body">
+        <span className="ag-confirm-label">Allow this action?</span>
+        <span className="ag-confirm-detail">
+          {pending.title}
+          {pending.detail ? ` · ${pending.detail}` : ""}
+        </span>
+      </div>
+      <div className="ag-confirm-actions">
+        <button
+          type="button"
+          className="ag-confirm-deny"
+          onClick={() => respondConfirmation(false)}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="ag-confirm-allow"
+          onClick={() => respondConfirmation(true)}
+        >
+          Allow
+        </button>
+      </div>
+    </div>
+  ) : null;
+
   const run = runs[0];
 
   // Idle: nothing captured, nothing running. Show a calm resting chip.
-  if (!run && !listening) {
+  if (!run && !listening && !pending) {
     return (
       <div className="ag-pill idle">
         <span className="ag-badge">FLOE</span>
@@ -53,7 +83,10 @@ export const AgentPill: React.FC = () => {
     );
   }
 
-  if (!run) return null;
+  // A confirmation can be open with no run yet only in edge cases; show it alone.
+  if (!run) {
+    return pending ? <div className="ag-pill open running">{confirmBlock}</div> : null;
+  }
 
   const working = run.phase === "running";
   const result = run.result;
@@ -73,6 +106,8 @@ export const AgentPill: React.FC = () => {
           ))}
         </div>
       )}
+
+      {confirmBlock}
 
       {result && (
         <div className="ag-result">

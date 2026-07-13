@@ -1,47 +1,51 @@
 /**
- * KeyfloeOnboarding — first-run flow, mirroring the Mac OnboardingView
- * (app/Sources/Onboarding/). Plain, welcoming English that teaches the
- * permissions, the activation key, and Snapshot.
+ * KeyfloeOnboarding — first-run flow, Windows edition, mirroring the Mac
+ * OnboardingView (app/Sources/Onboarding/). Plain, welcoming English that
+ * teaches the Right-Ctrl activation key and gets dictation actually usable.
  *
- * Steps: Welcome → Accessibility → Screen → Voice → Keys (feature cycle)
- *        → Plans → Done.
+ * Windows differs from Mac (PRD 5.7): there is NO macOS-style Accessibility or
+ * Screen-Recording permission prompt, so those steps are gone. What Windows
+ * DOES need before dictation works is a microphone permission and a downloaded
+ * Whisper model — dictation is inert without a model — so those are first-class
+ * steps here.
  *
- * Self-contained + presentational. The Tauri host wires the real permission
- * checks/requests via the optional `perms` prop; without it the flow still
- * runs (buttons say "Skip for now") so it can be previewed in a browser.
- * See INTEGRATION.md for the exact commands to pass in.
+ * Steps: Welcome → Voice (mic) → Model (download) → Keys (feature cycle) →
+ *        Plans → Done.
+ *
+ * Presentational. The Tauri host wires the real mic check/request via the
+ * optional `perms` prop and mounts Handy's ModelSelector/DownloadProgress via
+ * the `modelSlot` prop. Without them the flow still runs (buttons say "Skip for
+ * now") so it previews in a browser. See INTEGRATION.md.
  */
 import React, { useEffect, useMemo, useState } from "react";
+import { Keyboard, History as HistoryIcon, Command } from "lucide-react";
 import { DisplayTitle, Eyebrow, PrimaryButton, SecondaryButton } from "./components/primitives";
 import { KeyfloeKeyboard } from "./components/KeyfloeKeyboard";
 
 /* ── Permission wiring the host provides (all optional) ───────────────── */
 export interface OnboardingPermissions {
-  accessibilityGranted?: boolean;
-  screenGranted?: boolean;
   micGranted?: boolean;
-  speechGranted?: boolean;
-  requestAccessibility?: () => void;
-  openAccessibilitySettings?: () => void;
-  requestScreen?: () => void;
-  openScreenSettings?: () => void;
-  requestVoice?: () => void;
+  /** Prompt for the Windows microphone permission. */
+  requestMic?: () => void;
+  /** Open Windows Settings → Privacy → Microphone (fallback if denied). */
+  openMicSettings?: () => void;
+  /** True once at least one Whisper model is downloaded. */
+  modelReady?: boolean;
 }
 
-type Step = "welcome" | "accessibility" | "screen" | "voice" | "keys" | "plans" | "done";
-const STEPS: Step[] = ["welcome", "accessibility", "screen", "voice", "keys", "plans", "done"];
+type Step = "welcome" | "voice" | "model" | "keys" | "plans" | "done";
+const STEPS: Step[] = ["welcome", "voice", "model", "keys", "plans", "done"];
 
 const STEP_TITLE: Record<Step, string> = {
   welcome: "Welcome to Keyfloe",
-  accessibility: "Let Keyfloe help out",
-  screen: "Let Keyfloe see your screen",
-  voice: "Talk to Keyfloe",
+  voice: "Let Keyfloe hear you",
+  model: "Download the voice model",
   keys: "Try Keyfloe",
   plans: "Pick your plan",
   done: "You're all set",
 };
 
-/* ── Feature cycle inside the "Keys" step ─────────────────────────────── */
+/* ── Feature cycle inside the "Keys" step (Windows defaults, PRD 5.1) ──── */
 interface Feature {
   eyebrow: string;
   lead: string;
@@ -52,38 +56,38 @@ interface Feature {
 const FEATURES: Feature[] = [
   {
     eyebrow: "Feature 1 of 5",
-    lead: "Press ",
+    lead: "Tap Right Ctrl ",
     accent: "to chat.",
-    hint: "Tap fn anywhere on your PC. A chat popup floats up next to your cursor — type a question, paste a screenshot, or start a task.",
-    keys: ["fn"],
+    hint: "Tap the Right Ctrl key anywhere on your PC. A chat popup floats up next to your cursor — type a question, paste a screenshot, or start a task.",
+    keys: ["rctrl"],
   },
   {
     eyebrow: "Feature 2 of 5",
-    lead: "Hold ",
+    lead: "Hold Right Ctrl ",
     accent: "to talk.",
-    hint: "Hold fn and start talking. Keyfloe types the words wherever your cursor is, and keeps the full text on your clipboard so you can paste it anywhere.",
-    keys: ["fn"],
+    hint: "Hold Right Ctrl and start talking. Keyfloe types the words wherever your cursor is, and keeps the full text on your clipboard so you can paste it anywhere.",
+    keys: ["rctrl"],
   },
   {
     eyebrow: "Feature 3 of 5",
-    lead: "Tap ",
-    accent: "for the dashboard.",
-    hint: "Tap the right Alt key to open the Keyfloe dashboard from anywhere — recent activity, your current task, quick actions. Tap again to close.",
-    keys: ["ropt"],
+    lead: "Tap Caps Lock ",
+    accent: "to snapshot.",
+    hint: "Tap Caps Lock and drag a box over anything on screen — an error, a chart, a question. Keyfloe reads what's inside and answers it.",
+    keys: ["caps"],
   },
   {
     eyebrow: "Feature 4 of 5",
-    lead: "Press to ",
-    accent: "auto-answer.",
-    hint: "Press the left Ctrl key and Keyfloe answers the question in front of you — typed right where your cursor is, and copied to your clipboard too.",
-    keys: ["lctrl"],
+    lead: "Hold Caps Lock ",
+    accent: "for the agent.",
+    hint: "Hold Caps Lock, say a task like \"open youtube.com\", and release. Floe runs it in the background and shows each step in the pill.",
+    keys: ["caps"],
   },
   {
     eyebrow: "Feature 5 of 5",
-    lead: "Snapshot ",
-    accent: "anything.",
-    hint: "Hold the right Win key and drag a box over anything on screen — Keyfloe reads what's inside and answers it.",
-    keys: ["rcmd"],
+    lead: "Tap Right Alt ",
+    accent: "for interviews.",
+    hint: "On a call, tap Right Alt to turn on interview mode. Keyfloe listens to both sides and drafts a tailored answer in real time — invisible to screen-share.",
+    keys: ["ralt"],
   },
 ];
 
@@ -106,27 +110,16 @@ function WelcomeStep() {
   );
 }
 
-function PermissionStep({
-  eyebrow,
-  lead,
-  accent,
-  bullets,
-  granted,
-  footnote,
-  dots,
-}: {
-  eyebrow: string;
-  lead: string;
-  accent: string;
-  bullets: string[];
-  granted?: boolean;
-  footnote?: string;
-  dots?: [string, boolean | undefined][];
-}) {
+function VoiceStep({ granted, onOpenSettings }: { granted?: boolean; onOpenSettings?: () => void }) {
+  const bullets = [
+    "Microphone — Keyfloe hears you only while you hold a key to talk.",
+    "Nothing is recorded or stored. Audio is turned into text and then dropped.",
+    "Transcription runs on your PC, so your voice never leaves the machine.",
+  ];
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", display: "flex", flexDirection: "column", gap: 18, height: "100%", justifyContent: "center" }}>
-      <Eyebrow>{eyebrow}</Eyebrow>
-      <DisplayTitle lead={lead} accent={accent} size={36} />
+      <Eyebrow>Permission · Microphone</Eyebrow>
+      <DisplayTitle lead="Let Keyfloe " accent="hear you." size={36} />
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {bullets.map((b, i) => (
           <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
@@ -138,21 +131,46 @@ function PermissionStep({
       {granted ? (
         <div style={{ display: "flex", gap: 8, alignItems: "center", color: "var(--kf-green)" }}>
           <span>✓</span>
-          <span className="kf-eyebrow" style={{ color: "var(--kf-green)" }}>Granted</span>
+          <span className="kf-eyebrow" style={{ color: "var(--kf-green)" }}>Microphone granted</span>
         </div>
       ) : (
-        <>
-          {dots ? (
-            <div style={{ display: "flex", gap: 18 }}>
-              {dots.map(([label, ok]) => (
-                <span key={label} className="kf-eyebrow" style={{ color: ok ? "var(--kf-green)" : "var(--kf-ink-400)" }}>
-                  {ok ? "✓ " : "○ "}{label}
-                </span>
-              ))}
-            </div>
+        <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+          <Eyebrow>Windows will ask once — choose Allow</Eyebrow>
+          {onOpenSettings ? (
+            <button className="kf-btn kf-btn-secondary" style={{ fontSize: 11, padding: "6px 12px" }} onClick={onOpenSettings}>
+              Open Windows settings
+            </button>
           ) : null}
-          {footnote ? <Eyebrow>{footnote}</Eyebrow> : null}
-        </>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModelStep({ ready, slot }: { ready?: boolean; slot?: React.ReactNode }) {
+  return (
+    <div style={{ maxWidth: 620, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16, height: "100%", justifyContent: "center" }}>
+      <Eyebrow>On-device · Dictation</Eyebrow>
+      <DisplayTitle lead="Download the " accent="voice model." size={34} />
+      <p className="kf-muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
+        Dictation transcribes your voice right on your PC, so it's private and fast. Pick a model to
+        download once — a smaller one is quick and light, a larger one is more accurate. You can
+        change it later in Settings.
+      </p>
+      <div className="kf-panel" style={{ padding: slot ? 14 : 22 }}>
+        {slot ?? (
+          <span className="kf-muted" style={{ fontSize: 13 }}>
+            The model picker mounts here. Until a model is downloaded, dictation stays inactive.
+          </span>
+        )}
+      </div>
+      {ready ? (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", color: "var(--kf-green)" }}>
+          <span>✓</span>
+          <span className="kf-eyebrow" style={{ color: "var(--kf-green)" }}>Model ready — dictation is live</span>
+        </div>
+      ) : (
+        <Eyebrow>You can skip and download later in Settings</Eyebrow>
       )}
     </div>
   );
@@ -167,7 +185,7 @@ function KeysStep({ index, onIndex }: { index: number; onIndex: (i: number) => v
         <DisplayTitle lead={f.lead} accent={f.accent} size={34} />
         <p className="kf-muted" style={{ maxWidth: 560, fontSize: 13, lineHeight: 1.5 }}>{f.hint}</p>
       </div>
-      <KeyfloeKeyboard highlightedIds={f.keys} compact={index === 4} platform="windows" />
+      <KeyfloeKeyboard highlightedIds={f.keys} platform="windows" />
       <Eyebrow>Default binding — remappable in Cursor &amp; Keys</Eyebrow>
       <div style={{ display: "flex", gap: 6 }}>
         {FEATURES.map((_, i) => (
@@ -246,10 +264,10 @@ function PlansStep() {
 }
 
 function DoneStep() {
-  const rows = [
-    ["⌥", "Tap the right Alt key to open the dashboard from anywhere."],
-    ["⌨", "Remap every key in Cursor & Keys — pick which key triggers chat, dictation, or the dashboard."],
-    ["≡", "History tracks every dictation and AI answer Keyfloe pasted, ready to re-copy."],
+  const rows: [React.ReactNode, string][] = [
+    [<Command size={15} key="c" />, "Tap Right Ctrl to chat, hold it to talk. Every answer shows up in the pill."],
+    [<Keyboard size={15} key="k" />, "Remap every key in Cursor & Keys — pick which key triggers chat, dictation, snapshot or the agent."],
+    [<HistoryIcon size={15} key="h" />, "History keeps every dictation and AI answer Keyfloe pasted, ready to re-copy."],
   ];
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 22, paddingTop: 8, overflowY: "auto", height: "100%" }}>
@@ -261,7 +279,7 @@ function DoneStep() {
         <Eyebrow>Get around</Eyebrow>
         {rows.map(([icon, text]) => (
           <div key={text} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <span style={{ width: 16, textAlign: "center", flex: "none" }}>{icon}</span>
+            <span style={{ width: 18, display: "flex", justifyContent: "center", color: "var(--kf-ink-600)", flex: "none", marginTop: 1 }}>{icon}</span>
             <span style={{ fontSize: 13, lineHeight: 1.4 }}>{text}</span>
           </div>
         ))}
@@ -273,6 +291,14 @@ function DoneStep() {
           you've signed in.
         </span>
       </div>
+      <div className="kf-panel" style={{ maxWidth: 560, width: "100%", padding: 16, display: "flex", flexDirection: "column", gap: 6 }}>
+        <Eyebrow>One heads-up</Eyebrow>
+        <span className="kf-muted" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
+          Because Keyfloe is a new app, Windows SmartScreen or your antivirus may warn you the first
+          time. That's expected for new software. Choose "More info" then "Run anyway" — Keyfloe is
+          safe and signed.
+        </span>
+      </div>
     </div>
   );
 }
@@ -280,9 +306,12 @@ function DoneStep() {
 /* ── Shell ────────────────────────────────────────────────────────────── */
 export function KeyfloeOnboarding({
   perms,
+  modelSlot,
   onFinish,
 }: {
   perms?: OnboardingPermissions;
+  /** Handy's <ModelSelector/> + <DownloadProgressDisplay/> for the model step. */
+  modelSlot?: React.ReactNode;
   onFinish?: () => void;
 }) {
   const [stepIdx, setStepIdx] = useState(0);
@@ -307,9 +336,8 @@ export function KeyfloeOnboarding({
   const primaryLabel = useMemo(() => {
     switch (step) {
       case "welcome": return "Get started";
-      case "accessibility": return perms?.accessibilityGranted ? "Continue" : "Skip for now";
-      case "screen": return perms?.screenGranted ? "Continue" : "Skip for now";
-      case "voice": return perms?.micGranted && perms?.speechGranted ? "Continue" : "Skip for now";
+      case "voice": return perms?.micGranted ? "Continue" : "Allow microphone";
+      case "model": return perms?.modelReady ? "Continue" : "Skip for now";
       case "keys": return featureIdx < FEATURES.length - 1 ? "Next" : "Continue";
       case "plans": return "Start free";
       case "done": return "Open Keyfloe";
@@ -317,10 +345,10 @@ export function KeyfloeOnboarding({
   }, [step, featureIdx, perms]);
 
   const primaryAction = () => {
-    // Fire the permission request on the relevant steps before advancing.
-    if (step === "accessibility" && !perms?.accessibilityGranted) { perms?.requestAccessibility?.(); }
-    if (step === "screen" && !perms?.screenGranted) { perms?.requestScreen?.(); }
-    if (step === "voice" && !(perms?.micGranted && perms?.speechGranted)) { perms?.requestVoice?.(); }
+    // Fire the mic request on the voice step before advancing.
+    if (step === "voice" && !perms?.micGranted) {
+      perms?.requestMic?.();
+    }
     if (step === "done") { onFinish?.(); return; }
     next();
   };
@@ -341,43 +369,10 @@ export function KeyfloeOnboarding({
       {/* content */}
       <div style={{ flex: 1, padding: "0 40px", overflow: "hidden" }}>
         {step === "welcome" && <WelcomeStep />}
-        {step === "accessibility" && (
-          <PermissionStep
-            eyebrow="Permission · Input monitoring"
-            lead="Let Keyfloe " accent="help out."
-            granted={perms?.accessibilityGranted}
-            bullets={[
-              "Use your keyboard shortcuts (fn, Ctrl, Alt, Win) from any app.",
-              "Save every dictation and AI answer to your clipboard so you can paste it anywhere.",
-              "See which app and window you're in for sharper answers.",
-            ]}
-            footnote="Settings → Privacy → Keyfloe"
-          />
-        )}
-        {step === "screen" && (
-          <PermissionStep
-            eyebrow="Permission · Screen"
-            lead="Let Keyfloe " accent="see your screen."
-            granted={perms?.screenGranted}
-            bullets={[
-              "Snapshot AI — box anything on screen and Keyfloe answers what's inside.",
-              "Screen-aware answers — it reads what you're looking at for sharper replies.",
-              "Captured only the instant you ask. Nothing is ever recorded or stored.",
-            ]}
-          />
-        )}
         {step === "voice" && (
-          <PermissionStep
-            eyebrow="Permission · Voice"
-            lead="Talk to " accent="Keyfloe."
-            granted={perms?.micGranted && perms?.speechGranted}
-            bullets={[
-              "Microphone — hears you while you hold a key to talk.",
-              "Speech — turns your voice into text, right on your PC.",
-            ]}
-            dots={[["Microphone", perms?.micGranted], ["Speech", perms?.speechGranted]]}
-          />
+          <VoiceStep granted={perms?.micGranted} onOpenSettings={perms?.openMicSettings} />
         )}
+        {step === "model" && <ModelStep ready={perms?.modelReady} slot={modelSlot} />}
         {step === "keys" && <KeysStep index={featureIdx} onIndex={setFeatureIdx} />}
         {step === "plans" && <PlansStep />}
         {step === "done" && <DoneStep />}

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { toast, Toaster } from "sonner";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
@@ -11,15 +11,89 @@ import {
   KeyfloeOnboarding,
   KeyfloeDashboard,
   type DashboardTab,
+  type OnboardingPermissions,
 } from "./keyfloe/shell";
-import { KeybindingPanel } from "./keyfloe/keybinding";
+// The central key -> action dispatcher (P1-01). Mounting this once attaches the
+// app-lifetime `feature_trigger` listener that routes every bound tap/hold to
+// the right feature action (chat/dictation/snapshot/interview/agent/...).
+import { KeybindingPanel, useFeatureDispatch } from "./keyfloe/keybinding";
 import { DictationPanel, DictationHistory } from "./keyfloe/dictation";
-import { InterviewContextPanel } from "./keyfloe/interview";
+// The interview-folder InterviewTab renders only the session body; the shell's
+// own InterviewTab wrapper supplies the scroll container + header (name clash,
+// so alias this one).
+import { InterviewTab as InterviewBody } from "./keyfloe/interview";
+import { AccountProvider, useAccount, SignIn, Connections } from "./keyfloe/auth";
+import ModelSelector from "@/components/model-selector";
+import { GeneralSettings, ModelsSettings } from "@/components/settings";
+import { useModelStore } from "./stores/modelStore";
 import { commands } from "@/bindings";
 import { useSettingsStore } from "./stores/settingsStore";
 import { getLanguageDirection, initializeRTL } from "@/lib/utils/rtl";
 
 type OnboardingStep = "onboarding" | "done";
+
+/* ── Settings tab: Handy's full surface + Keyfloe AI-polish/vocab/stats ──── */
+function SettingsView() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+      <GeneralSettings />
+      <ModelsSettings />
+      <DictationPanel />
+    </div>
+  );
+}
+
+/* ── Post-onboarding dashboard (inside AccountProvider so it can read /me) ── */
+function AppShell({
+  tab,
+  onTab,
+  direction,
+}: {
+  tab: DashboardTab;
+  onTab: (t: DashboardTab) => void;
+  direction: "ltr" | "rtl";
+}) {
+  const { t } = useTranslation();
+  const { account, signOut } = useAccount();
+
+  // Attach the key -> action dispatcher for the whole app lifetime.
+  useFeatureDispatch();
+
+  return (
+    <div dir={direction} className="kf-root h-screen select-none cursor-default">
+      <Toaster
+        theme="system"
+        toastOptions={{
+          unstyled: true,
+          classNames: {
+            toast:
+              "kf-toast bg-background border border-mid-gray/20 rounded-lg shadow-lg px-4 py-3 flex items-center gap-3 text-sm",
+            title: "font-medium",
+            description: "text-mid-gray",
+          },
+        }}
+      />
+      <KeyfloeDashboard
+        tab={tab}
+        onTab={onTab}
+        account={account ?? undefined}
+        onSignOut={() => {
+          void signOut().catch(() =>
+            toast.error(t("errors.recordingFailed", { error: "Sign out failed" })),
+          );
+        }}
+        slots={{
+          keys: <KeybindingPanel />,
+          history: <DictationHistory />,
+          interview: <InterviewBody />,
+          settings: <SettingsView />,
+          accountSignIn: <SignIn />,
+          connections: <Connections />,
+        }}
+      />
+    </div>
+  );
+}
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -31,6 +105,21 @@ function App() {
   const updateSetting = useSettingsStore((s) => s.updateSetting);
   const hasCompletedPostOnboardingInit = useRef(false);
 
+  // Onboarding permission wiring (mic + Whisper model download).
+  const [micGranted, setMicGranted] = useState(false);
+  const modelReady = useModelStore((s) =>
+    s.models.some((m) => m.is_downloaded),
+  );
+
+  const refreshMic = useCallback(async () => {
+    try {
+      const status = await commands.getWindowsMicrophonePermissionStatus();
+      setMicGranted(status.overall_access === "allowed");
+    } catch {
+      // Non-Windows / unsupported: leave as-is (the flow still advances).
+    }
+  }, []);
+
   useEffect(() => {
     checkOnboardingStatus();
   }, []);
@@ -38,6 +127,20 @@ function App() {
   useEffect(() => {
     initializeRTL(i18n.language);
   }, [i18n.language]);
+
+  // Poll mic permission while onboarding so the "Allow microphone" step flips
+  // to "Continue" once the user grants it in Windows Settings.
+  useEffect(() => {
+    if (onboardingStep !== "onboarding") return;
+    void refreshMic();
+    const id = setInterval(refreshMic, 1500);
+    return () => clearInterval(id);
+  }, [onboardingStep, refreshMic]);
+
+  // Load the model registry so onboarding's ModelSelector + modelReady work.
+  useEffect(() => {
+    void useModelStore.getState().loadModels();
+  }, []);
 
   // Bring up the native input/shortcut layer once we reach the app proper.
   useEffect(() => {
@@ -133,8 +236,7 @@ function App() {
   const finishOnboarding = async () => {
     // Persist so onboarding doesn't re-show. Handy has no standalone
     // "onboarding complete" command (it flips the flag as a side-effect of
-    // model download), so we go through the settings store. The dedicated
-    // Rust persister for this key is wired in the backend-integration phase.
+    // model download), so we go through the settings store.
     try {
       await updateSetting("onboarding_completed", true);
     } catch (e) {
@@ -143,42 +245,41 @@ function App() {
     setOnboardingStep("done");
   };
 
+  const perms = useMemo<OnboardingPermissions>(
+    () => ({
+      micGranted,
+      // Windows has no in-process mic consent dialog; the mic-privacy settings
+      // page is where the user grants it, then the poll above flips micGranted.
+      requestMic: () => {
+        void commands.openMicrophonePrivacySettings();
+      },
+      openMicSettings: () => {
+        void commands.openMicrophonePrivacySettings();
+      },
+      modelReady,
+    }),
+    [micGranted, modelReady],
+  );
+
   // Still resolving first-run state.
   if (onboardingStep === null) return null;
 
   if (onboardingStep === "onboarding") {
     return (
       <div dir={direction} className="kf-root">
-        <KeyfloeOnboarding onFinish={finishOnboarding} />
+        <KeyfloeOnboarding
+          onFinish={finishOnboarding}
+          perms={perms}
+          modelSlot={<ModelSelector />}
+        />
       </div>
     );
   }
 
   return (
-    <div dir={direction} className="kf-root h-screen select-none cursor-default">
-      <Toaster
-        theme="system"
-        toastOptions={{
-          unstyled: true,
-          classNames: {
-            toast:
-              "kf-toast bg-background border border-mid-gray/20 rounded-lg shadow-lg px-4 py-3 flex items-center gap-3 text-sm",
-            title: "font-medium",
-            description: "text-mid-gray",
-          },
-        }}
-      />
-      <KeyfloeDashboard
-        tab={tab}
-        onTab={setTab}
-        slots={{
-          keys: <KeybindingPanel />,
-          history: <DictationHistory />,
-          interview: <InterviewContextPanel />,
-          settings: <DictationPanel />,
-        }}
-      />
-    </div>
+    <AccountProvider>
+      <AppShell tab={tab} onTab={setTab} direction={direction} />
+    </AccountProvider>
   );
 }
 

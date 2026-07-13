@@ -8,5 +8,10 @@ export { AgentPill } from "./AgentPill";
 export { AgentComposer } from "./AgentComposer";
 export { AgentStepCard } from "./AgentStepCard";
 export { AgentReportCard } from "./AgentReportCard";
-export { useAgentStore, disposeAgentStore } from "./useAgentStore";
+export {
+  useAgentStore,
+  disposeAgentStore,
+  startAgentCapture,
+  stopAgentCapture,
+} from "./useAgentStore";
 export * from "./types";

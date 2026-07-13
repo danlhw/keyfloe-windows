@@ -9,6 +9,15 @@
  * OR self-managed (leave `tab`/`onTab` unset to let it own its own state).
  */
 import React, { useState } from "react";
+import {
+  Home as HomeIcon,
+  History as HistoryIcon,
+  Keyboard as KeyboardIcon,
+  Radio as RadioIcon,
+  User as UserIcon,
+  Settings as SettingsIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { KeyfloeLogo } from "./components/KeyfloeLogo";
 import {
   AccountTab,
@@ -21,26 +30,32 @@ import {
 
 export type DashboardTab = "home" | "history" | "keys" | "interview" | "account" | "settings";
 
-const TABS: { id: DashboardTab; label: string; icon: string }[] = [
-  { id: "home", label: "Home", icon: "⌂" },
-  { id: "history", label: "History", icon: "≡" },
-  { id: "keys", label: "Cursor & Keys", icon: "⌨" },
-  { id: "interview", label: "Interview", icon: "◉" },
-  { id: "account", label: "Account", icon: "○" },
-  { id: "settings", label: "Settings", icon: "⚙" },
+const TABS: { id: DashboardTab; label: string; icon: LucideIcon }[] = [
+  { id: "home", label: "Home", icon: HomeIcon },
+  { id: "history", label: "History", icon: HistoryIcon },
+  { id: "keys", label: "Cursor & Keys", icon: KeyboardIcon },
+  { id: "interview", label: "Interview", icon: RadioIcon },
+  { id: "account", label: "Account", icon: UserIcon },
+  { id: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
 export interface DashboardSlots {
   history?: React.ReactNode;
   keys?: React.ReactNode;
   interview?: React.ReactNode;
+  /** Full override of the Account tab body. */
   account?: React.ReactNode;
+  /** The Supabase sign-in form (auth/SignIn) — shown when signed out. */
+  accountSignIn?: React.ReactNode;
+  /** Me → Connections (auth/Connections) — shown when signed in. */
+  connections?: React.ReactNode;
   settings?: React.ReactNode;
   interviewProfile?: React.ReactNode;
 }
 
 export interface DashboardAccount {
   email?: string;
+  name?: string;
   plan?: string;
   unlimited?: boolean;
   usedToday?: number;
@@ -85,16 +100,21 @@ export function KeyfloeDashboard({
         <div style={{ padding: "4px 8px 18px" }}>
           <KeyfloeLogo height={22} />
         </div>
-        {TABS.map((t) => (
-          <div
-            key={t.id}
-            className={`kf-sidebar-item${active === t.id ? " kf-active" : ""}`}
-            onClick={() => setActive(t.id)}
-          >
-            <span style={{ width: 18, textAlign: "center", fontSize: 13 }} aria-hidden>{t.icon}</span>
-            <span>{t.label}</span>
-          </div>
-        ))}
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          return (
+            <div
+              key={t.id}
+              className={`kf-sidebar-item${active === t.id ? " kf-active" : ""}`}
+              onClick={() => setActive(t.id)}
+            >
+              <span style={{ width: 18, display: "flex", justifyContent: "center" }} aria-hidden>
+                <Icon size={15} strokeWidth={1.75} />
+              </span>
+              <span>{t.label}</span>
+            </div>
+          );
+        })}
         <div style={{ flex: 1 }} />
         <div className="kf-eyebrow" style={{ padding: "0 8px", fontSize: 9 }}>v0.1.0</div>
       </nav>
@@ -108,7 +128,14 @@ export function KeyfloeDashboard({
         {active === "keys" && <KeysTab slot={slots?.keys} />}
         {active === "interview" && <InterviewTab slot={slots?.interview} />}
         {active === "account" && (
-          <AccountTab account={account} slot={slots?.account} onSignIn={onSignIn} onSignOut={onSignOut} />
+          <AccountTab
+            account={account}
+            slot={slots?.account}
+            signInSlot={slots?.accountSignIn}
+            connectionsSlot={slots?.connections}
+            onSignIn={onSignIn}
+            onSignOut={onSignOut}
+          />
         )}
         {active === "settings" && <SettingsTab slot={slots?.settings} />}
       </main>

@@ -26,6 +26,8 @@ export default defineConfig(async () => ({
         // Keyfloe feature overlay windows (created programmatically at runtime).
         snapshotOverlay: resolve(__dirname, "src/keyfloe/snapshot/overlay.html"),
         interviewOverlay: resolve(__dirname, "src/keyfloe/interview/overlay.html"),
+        // The pill — the single visual record of all AI activity (P1-02).
+        pill: resolve(__dirname, "src/keyfloe/shell/pill.html"),
       },
     },
   },

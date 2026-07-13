@@ -15,20 +15,57 @@
 //!     providers directly (no worker, no quota) for local testing, exactly
 //!     like the Mac app's dev path.
 //!
-//! NOTE: the auth token is read from `KEYFLOE_ACCESS_TOKEN` (env) or
-//! `<app_data>/keyfloe/auth.json`. Feature A (shell/login) owns real login;
-//! once it lands, point `auth_token()` at the shared token source. Flagged in
-//! INTEGRATION.md.
+//! AUTH SOURCE — central AuthState (task P1-05). Credentials (base URL + Supabase
+//! JWT + device id) are resolved once per session in `resolve_creds()`. That
+//! function currently falls back to env + the legacy on-disk stores so interview
+//! mode works standalone, but it is the SINGLE integration seam: when the shared
+//! `keyfloe::auth` module lands, replace the three marked lines in
+//! `resolve_creds()` with `auth::base_url(app)` / `auth::get_jwt(app)` /
+//! `auth::get_device_id(app)` (see INTEGRATION.md + the integrator notes). No
+//! other call site reads auth, so that one swap moves the whole feature onto
+//! central auth (Windows Credential Manager via the keyring crate).
 
 use once_cell::sync::Lazy;
+use std::path::Path;
 use std::sync::Mutex;
+use tauri::AppHandle;
 
-/// Backend base URL. The Mac app's proven base is the Cloudflare worker; the
-/// documented migration target is keyfloe.com. Override at runtime with
-/// `KEYFLOE_API_BASE`. See INTEGRATION.md ("backend base") for which to ship.
+/// Backend base URL. Ships pointed at keyfloe.com/v1 (the shared production
+/// backend). Override at runtime with `KEYFLOE_API_BASE` (e.g. to hit a preview
+/// deployment). Paths are appended as `{base}/v1/...`.
 pub fn api_base() -> String {
     std::env::var("KEYFLOE_API_BASE")
-        .unwrap_or_else(|_| "https://oneclick-worker.daniel-leung101.workers.dev".to_string())
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .unwrap_or_else(|| "https://keyfloe.com".to_string())
+}
+
+/// Resolved per-session credentials for the shared backend.
+#[derive(Clone)]
+pub struct AuthCreds {
+    pub base: String,
+    /// Supabase JWT for the signed-in user, if any.
+    pub jwt: Option<String>,
+    /// Stable per-install id (worker/quota key).
+    pub device_id: String,
+}
+
+/// Resolve base URL + JWT + device id for backend calls.
+///
+/// INTEGRATION(P1-05 central AuthState): replace the three resolution lines
+/// below with the shared accessors once `crate::keyfloe::auth` is registered:
+/// ```ignore
+/// base:      crate::keyfloe::auth::base_url(app),
+/// jwt:       crate::keyfloe::auth::get_jwt(app),
+/// device_id: crate::keyfloe::auth::get_device_id(app),
+/// ```
+/// Until then this reads env + the legacy files so the feature runs standalone.
+pub fn resolve_creds(_app: &AppHandle, data_dir: &Path) -> AuthCreds {
+    AuthCreds {
+        base: api_base(),
+        jwt: legacy_auth_token(data_dir),
+        device_id: device_id(data_dir),
+    }
 }
 
 fn env_opt(name: &str) -> Option<String> {
@@ -70,8 +107,9 @@ fn gen_id() -> String {
     format!("{:016x}-{:08x}", nanos as u64, stack as u32)
 }
 
-/// Supabase JWT for the signed-in user, if any.
-pub fn auth_token(data_dir: &std::path::Path) -> Option<String> {
+/// Legacy Supabase-JWT fallback (env or `<app_data>/keyfloe/auth.json`). Only
+/// used until central AuthState is wired into `resolve_creds()`.
+fn legacy_auth_token(data_dir: &std::path::Path) -> Option<String> {
     if let Some(t) = env_opt("KEYFLOE_ACCESS_TOKEN") {
         return Some(t);
     }
@@ -93,14 +131,17 @@ pub struct ChatMsg {
 
 pub struct KeyfloeApi {
     client: reqwest::Client,
-    data_dir: std::path::PathBuf,
+    creds: AuthCreds,
 }
 
 impl KeyfloeApi {
-    pub fn new(data_dir: std::path::PathBuf) -> Self {
+    /// Resolve credentials (base URL + JWT + device id) once, up front. `app` is
+    /// the seam central AuthState reads from; `data_dir` feeds the legacy
+    /// fallback until then.
+    pub fn new(app: &AppHandle, data_dir: std::path::PathBuf) -> Self {
         Self {
             client: reqwest::Client::new(),
-            data_dir,
+            creds: resolve_creds(app, &data_dir),
         }
     }
 
@@ -125,12 +166,12 @@ impl KeyfloeApi {
             let req = self.client.post(&url).bearer_auth(key);
             (url, req)
         } else {
-            let url = format!("{}/v1/transcribe", api_base());
+            let url = format!("{}/v1/transcribe", self.creds.base);
             let mut req = self
                 .client
                 .post(&url)
-                .header("x-oneclick-device-id", device_id(&self.data_dir));
-            if let Some(tok) = auth_token(&self.data_dir) {
+                .header("x-oneclick-device-id", self.creds.device_id.clone());
+            if let Some(tok) = &self.creds.jwt {
                 req = req.bearer_auth(tok);
             }
             if let Some(bypass) = env_opt("KEYFLOE_DEV_BYPASS") {
@@ -190,11 +231,11 @@ impl KeyfloeApi {
         } else {
             let mut r = self
                 .client
-                .post(format!("{}/v1/chat", api_base()))
+                .post(format!("{}/v1/chat", self.creds.base))
                 .header("content-type", "application/json")
-                .header("x-oneclick-device-id", device_id(&self.data_dir))
+                .header("x-oneclick-device-id", self.creds.device_id.clone())
                 .header("x-oneclick-feature", "interview");
-            if let Some(tok) = auth_token(&self.data_dir) {
+            if let Some(tok) = &self.creds.jwt {
                 r = r.bearer_auth(tok);
             }
             if let Some(bypass) = env_opt("KEYFLOE_DEV_BYPASS") {

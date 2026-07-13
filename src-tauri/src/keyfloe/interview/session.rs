@@ -140,7 +140,7 @@ impl InterviewSession {
         let app = app.clone();
         let turns = self.turns.clone();
         let stop = self.worker_stop.clone();
-        let api = Arc::new(KeyfloeApi::new(data_dir));
+        let api = Arc::new(KeyfloeApi::new(&app, data_dir));
 
         // The worker OWNS the (non-Send) cpal streams for their whole lifetime,
         // reports startup success back over `ready`, then runs the chunker loop
@@ -258,7 +258,7 @@ impl InterviewSession {
         let user = build_interview_prompt(&transcript);
 
         let _ = app.emit(EV_ANSWER_BEGIN, ());
-        let api = KeyfloeApi::new(data_dir);
+        let api = KeyfloeApi::new(app, data_dir);
         let app_for_delta = app.clone();
         let result = api
             .chat_stream(

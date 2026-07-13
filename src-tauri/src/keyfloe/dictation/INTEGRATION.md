@@ -46,42 +46,61 @@ listens for `keyfloe://dictation-caption` via raw `listen`.
 
 ## 3. Wire the polish + side-effects into `actions.rs`
 
-Handy's `TranscribeAction::stop` transcribes, then calls
-`process_transcription_output(...)`, then pastes on the main thread. Swap the
-Keyfloe parity layer in around the paste. Minimal diff:
+> NOTE: `mod keyfloe;` already declares this module in `lib.rs` and all ten
+> `keyfloe::dictation::commands::*` are already in `collect_commands![]` (steps
+> 1–2 above are done). The ONLY remaining wiring is the `actions.rs` stop path
+> below — `process_dictation` / `on_dictation_pasted` currently have zero call
+> sites (grep-confirmed), so the whole parity layer is dead until you add this.
 
-**a)** In the async task in `TranscribeAction::stop`, after you have the raw
-`transcription: String` (and `sample_count`), replace the
+The foreground window MUST be captured at record **start** (before any Keyfloe
+overlay/pill can steal focus), then used at **stop**. The module stashes it for
+you so the two edit sites stay trivial and you never thread the value through
+Handy's plumbing.
+
+**Only route this for the DICTATION binding, not the agent** — the Floe agent
+reuses the same recording pipeline but transcribes to `run_agent_voice_command`
+instead of pasting (see agent P1-09). If both share `TranscribeAction`, gate on
+which binding/mode triggered the capture and skip the block below for agent.
+
+**a)** In `TranscribeAction::start` (dictation only), right as the trigger
+fires and before showing any overlay:
+
+```rust
+keyfloe::dictation::focus::capture_and_stash();
+```
+
+**b)** In the async task in `TranscribeAction::stop`, after you have the raw
+`transcription: String` (and `sample_count`), REPLACE the
 `process_transcription_output(...)` call with:
 
 ```rust
-// Foreground app the user is dictating into (captured before we touch the
-// overlay; Handy's overlay is non-activating so this is the user's window).
-let fg = keyfloe_dictation::focus::capture_foreground();
+// The window we captured at start (Some on Windows when a real app was focused).
+let fg = keyfloe::dictation::focus::take_stashed();
 let duration_sec = sample_count as f64 / 16_000.0; // 16 kHz mono PCM
 
 // Keyfloe parity: local self-correction strip → cloud AI polish (app-aware) →
 // clean paste-ready text. Never throws; falls back to local cleanup offline.
 let final_text =
-    keyfloe_dictation::process_dictation(&ah, &transcription, fg.as_ref()).await;
+    keyfloe::dictation::process_dictation(&ah, &transcription, fg.as_ref()).await;
 ```
 
 Then paste `final_text` (as Handy already does). Immediately **before** the
 `utils::paste(...)` call on the main thread, restore focus so Ctrl+V lands in
-the user's app:
+the user's app (requires the pill be `WS_EX_NOACTIVATE`, P1-02):
 
 ```rust
 if let Some(fg) = fg.as_ref() {
-    keyfloe_dictation::focus::restore_foreground(fg);
+    keyfloe::dictation::focus::restore_foreground(fg);
 }
 match utils::paste(final_text.clone(), ah_clone.clone()) { /* unchanged */ }
 ```
 
-**b)** After a successful paste, fire the side-effects (stats + transcript log +
-learn-from-corrections):
+**c)** After a successful paste, fire the side-effects (stats + transcript log +
+learn-from-corrections). `fg` was moved into the main-thread paste closure, so
+clone it beforehand or capture `duration_sec`/`fg` before the closure:
 
 ```rust
-keyfloe_dictation::on_dictation_pasted(&ah, &final_text, duration_sec, fg.as_ref());
+keyfloe::dictation::on_dictation_pasted(&ah, &final_text, duration_sec, fg.as_ref());
 ```
 
 > You can keep Handy's history save if you want both; Keyfloe's dictation log is
@@ -91,15 +110,18 @@ keyfloe_dictation::on_dictation_pasted(&ah, &final_text, duration_sec, fg.as_ref
 
 In `managers/transcription.rs`, the whisper path already builds an
 `initial_prompt` from `settings.custom_words`. To also bias whisper toward the
-user's learned vocabulary (gated on the `vocabulary_prompt_enabled` setting),
-prepend the hint:
+user's learned vocabulary, prepend the hint:
 
 ```rust
-let hint = crate::keyfloe_dictation::vocabulary::whisper_prompt_hint(&self.app_handle);
+let hint = crate::keyfloe::dictation::vocabulary::whisper_prompt_hint(&self.app_handle);
 let mut prompt_parts = settings.custom_words.clone();
 if !hint.is_empty() { prompt_parts.insert(0, hint); }
 // ...use prompt_parts.join(", ") as the WhisperRunOptions.initial_prompt
 ```
+
+`whisper_prompt_hint` is already gated on the `vocabulary_prompt_enabled`
+setting (returns `""` when off or when there are no active learned terms), so
+this one-liner is safe to add unconditionally.
 
 This is optional; polish already preserves vocabulary via its "preserve these
 terms" hint, so skipping it only affects first-pass whisper spelling.
@@ -114,15 +136,13 @@ Focus save/restore (`focus.rs`) uses `GetForegroundWindow` / `GetWindowTextW` /
 `SetForegroundWindow`, covered by the already-enabled windows features
 `Win32_Foundation` + `Win32_UI_WindowsAndMessaging`.
 
-For the FULL learn-from-corrections field read (`correction_learner.rs` — today a
-safe no-op stub), add ONE windows feature to `Cargo.toml`'s `windows` deps:
-- `Win32_UI_Accessibility` (recommended — `IUIAutomation::GetFocusedElement` +
-  `CurrentValue`), or
-- keep `Win32_UI_WindowsAndMessaging` and use `GetGUIThreadInfo` + `WM_GETTEXT`
-  via `SendMessageTimeoutW` for standard edit controls.
-
-Do **not** edit `Cargo.toml` from a parallel run — hand this note to whoever
-batches dependency changes.
+The learn-from-corrections field read (`correction_learner::focused_field_text`)
+is now IMPLEMENTED via Win32 UI Automation (`IUIAutomation::GetFocusedElement`
+→ ValuePattern, TextPattern fallback). It needs the windows-crate feature
+`Win32_UI_Accessibility` **plus** `Win32_System_Com` — both are ALREADY enabled
+in `Cargo.toml` (lines ~120–130), so no dependency change is required. It also
+pulls in `windows::core::Interface` (`.cast()`) which the crate provides by
+default. Compile-only on Mac; needs Windows verification (see §7).
 
 ## 6. Auth handoff (shared backend)
 
@@ -130,16 +150,23 @@ The polish client calls `keyfloe.com/v1/chat` (Anthropic Messages proxy) as an
 INTERNAL call (`x-keyfloe-internal: 1`, `x-oneclick-feature: dictation`) so it
 never counts against the user's daily quota — dictation stays unlimited.
 
-It reads the session from `<app_data_dir>/keyfloe-auth.json`:
+**Central AuthState (P1-05) is the intended source of JWT + device-id.** Because
+this feature builds in isolation and can't reference the (parallel) `keyfloe::auth`
+module, `auth.rs` exposes ONE seam function, `central_credentials(app)`, which
+today returns `None`. **INTEGRATOR: once `keyfloe::auth::AuthState` is `.manage()`d,
+replace that one function's body** to read `get_jwt()` / `get_device_id()` /
+`base_url()` from it (the exact snippet is in the function's doc comment). Nothing
+else changes — `resolve()` already prefers those creds when present.
+
+Until the seam is wired, it falls back to `<app_data_dir>/keyfloe-auth.json`:
 
 ```json
 { "jwt": "<supabase access token>", "device_id": "<optional; auto-generated if absent>" }
 ```
 
-**Feature A (shell/onboarding) must write this file after sign-in.** Env
-overrides for dev: `ANTHROPIC_API_KEY` (direct to Anthropic, no worker),
-`KEYFLOE_JWT` (bearer), `KEYFLOE_BASE_URL` (backend base; default
-`https://keyfloe.com`).
+Env overrides (still honored above the central state for ops flexibility):
+`ANTHROPIC_API_KEY` (direct to Anthropic, no worker), `KEYFLOE_JWT` (bearer),
+`KEYFLOE_BASE_URL` (backend base; default `https://keyfloe.com`).
 
 > ⚠️ Host caveat (from the Mac app): Vercel's firewall may challenge non-browser
 > requests to `keyfloe.com/v1/*`. If polish returns HTTP challenges, point

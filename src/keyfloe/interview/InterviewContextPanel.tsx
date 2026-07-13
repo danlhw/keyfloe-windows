@@ -3,12 +3,20 @@
 // résumé-docs surfaces. The material entered here tailors every interview answer.
 
 import { useEffect, useState, type ReactNode } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { useInterviewContext } from "./interviewContextStore";
-import { CMD, type InterviewProfile } from "./types";
+import { toggleInterview } from "./interviewActions";
+import { type InterviewProfile } from "./types";
 import "./InterviewContextPanel.css";
 
-export default function InterviewContextPanel() {
+export default function InterviewContextPanel({
+  // When embedded inside <InterviewTab/> the session control lives in the tab
+  // header, so hide this panel's own "Interview mode" heading + Start button to
+  // avoid a duplicate control. Defaults to the standalone layout (header shown)
+  // so mounting <InterviewContextPanel/> on its own still works.
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const {
     ctx,
     loaded,
@@ -32,20 +40,21 @@ export default function InterviewContextPanel() {
 
   return (
     <div className="kf-ivc">
-      <div className="kf-ivc-head">
-        <h2>Interview mode</h2>
-        <button
-          className="kf-ivc-start"
-          onClick={() => invoke(CMD.toggle).catch(console.error)}
-        >
-          Start interview
-        </button>
-      </div>
-      <p className="kf-ivc-sub">
-        A private, screen-share-invisible overlay listens to you and the
-        interviewer and feeds you tailored answers. Add your background below so
-        answers sound like you.
-      </p>
+      {!embedded && (
+        <>
+          <div className="kf-ivc-head">
+            <h2>Interview mode</h2>
+            <button className="kf-ivc-start" onClick={() => toggleInterview()}>
+              Start interview
+            </button>
+          </div>
+          <p className="kf-ivc-sub">
+            A private, screen-share-invisible overlay listens to you and the
+            interviewer and feeds you tailored answers. Add your background below
+            so answers sound like you.
+          </p>
+        </>
+      )}
 
       {/* About me -------------------------------------------------- */}
       <section className="kf-ivc-card">

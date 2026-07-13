@@ -14,6 +14,9 @@
 use serde_json::{json, Value};
 use tauri::{AppHandle, Manager};
 
+/// How long we wait for a queued main-thread input op to run before giving up.
+const INPUT_MAIN_THREAD_TIMEOUT_SECS: u64 = 20;
+
 /// Anthropic tool-schema dicts for every local tool. The session appends the
 /// hosted `web_search` tool to this list before each run.
 pub fn definitions() -> Vec<Value> {
@@ -148,6 +151,14 @@ fn titlecase(s: &str) -> String {
     }
 }
 
+/// Whether a tool call touches the user's machine in a way that should pause
+/// for explicit approval (PRD principle #4 — human-in-the-loop). Synthetic
+/// typing and clicking qualify; reads (open_url/open_app/move_mouse/web_search)
+/// do not — the user already asked for those and they can't destroy anything.
+pub fn is_risky(tool: &str, _input: &Value) -> bool {
+    matches!(tool, "type_text" | "click")
+}
+
 /// Run one local tool and return a plain-string result the agent feeds back as
 /// a `tool_result`. Prose (not typed errors) so the session's failure
 /// heuristic can flag a step red — matches the Mac's LocalTools contract.
@@ -155,14 +166,17 @@ pub async fn dispatch(app: &AppHandle, name: &str, input: &Value) -> String {
     match name {
         "open_url" => open_url(&input.get("url").and_then(|v| v.as_str()).unwrap_or("").to_string()),
         "open_app" => open_app(&input.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string()),
-        "type_text" => type_text(app, input.get("text").and_then(|v| v.as_str()).unwrap_or("")),
-        "click" => click(
-            app,
-            int(input, "x") as i32,
-            int(input, "y") as i32,
-            input.get("button").and_then(|v| v.as_str()).unwrap_or("left"),
-        ),
-        "move_mouse" => move_mouse(app, int(input, "x") as i32, int(input, "y") as i32),
+        "type_text" => type_text(app, input.get("text").and_then(|v| v.as_str()).unwrap_or("")).await,
+        "click" => {
+            click(
+                app,
+                int(input, "x") as i32,
+                int(input, "y") as i32,
+                input.get("button").and_then(|v| v.as_str()).unwrap_or("left"),
+            )
+            .await
+        }
+        "move_mouse" => move_mouse(app, int(input, "x") as i32, int(input, "y") as i32).await,
         _ => format!("Unknown tool '{}'.", name),
     }
 }
@@ -232,59 +246,113 @@ fn open_app(name: &str) -> String {
     }
 }
 
-/// Type text via the shared Enigo instance. Reuses `crate::input::EnigoState`
-/// (managed at startup) so we don't init a second automation backend.
-fn type_text(app: &AppHandle, text: &str) -> String {
+/// Run an `enigo` operation on the app's MAIN thread and return its prose
+/// result. Two reasons this is not a plain `state.0.lock()` inline:
+///   1. Enigo's synthetic input is most reliable when driven from the main
+///      thread — `actions.rs` already pastes via `run_on_main_thread` for the
+///      same reason, and Windows `SendInput` can be dropped from a worker
+///      thread. The agent's tool loop runs on the async pool, so we hop.
+///   2. Init guard — `EnigoState` is only `.manage()`d after the user finishes
+///      onboarding (`initialize_enigo`). If the agent fires before that, we
+///      return a friendly note instead of failing silently.
+///
+/// The op is queued to the main thread; we block on a channel from the blocking
+/// pool (never an async worker) so the agent's turn simply awaits the result.
+async fn exec_on_main<F>(app: &AppHandle, label: &str, f: F) -> String
+where
+    F: FnOnce(&mut enigo::Enigo) -> String + Send + 'static,
+{
+    let app_main = app.clone();
+    let label_owned = label.to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        let (tx, rx) = std::sync::mpsc::channel::<String>();
+        let app_inner = app_main.clone();
+        let queued = app_main.run_on_main_thread(move || {
+            let out = match app_inner.try_state::<crate::input::EnigoState>() {
+                None => "input backend isn't ready yet. Finish setup first.".to_string(),
+                Some(state) => match state.0.lock() {
+                    Ok(mut enigo) => f(&mut enigo),
+                    Err(_) => "input backend is busy.".to_string(),
+                },
+            };
+            let _ = tx.send(out);
+        });
+        if let Err(e) = queued {
+            return format!("Couldn't {label_owned}: {e}");
+        }
+        match rx.recv_timeout(std::time::Duration::from_secs(INPUT_MAIN_THREAD_TIMEOUT_SECS)) {
+            Ok(s) => {
+                // Bare failures from the closure ("input backend isn't ready…")
+                // are prefixed so the pill reads naturally and `looks_like_failure`
+                // still flags the step red.
+                if s.starts_with("input backend") {
+                    format!("Couldn't {label_owned}: {s}")
+                } else {
+                    s
+                }
+            }
+            Err(_) => format!("Couldn't {label_owned}: the input request timed out."),
+        }
+    })
+    .await
+    .unwrap_or_else(|_| format!("Couldn't {label}: the input task failed."))
+}
+
+/// Type text via the shared Enigo instance (main thread — see `exec_on_main`).
+async fn type_text(app: &AppHandle, text: &str) -> String {
     if text.is_empty() {
         return "Nothing to type.".into();
     }
-    let Some(state) = app.try_state::<crate::input::EnigoState>() else {
-        return "Couldn't type: input backend isn't initialised.".into();
-    };
-    let Ok(mut enigo) = state.0.lock() else {
-        return "Couldn't type: input backend is busy.".into();
-    };
-    use enigo::Keyboard;
-    match enigo.text(text) {
-        Ok(_) => format!("Typed: {}", clip_for_result(text)),
-        Err(e) => format!("Couldn't type the text: {}", e),
-    }
+    let text_owned = text.to_string();
+    let echo = clip_for_result(text);
+    exec_on_main(app, "type the text", move |enigo| {
+        use enigo::Keyboard;
+        match enigo.text(&text_owned) {
+            Ok(_) => format!("Typed: {}", echo),
+            Err(e) => format!("Couldn't type the text: {}", e),
+        }
+    })
+    .await
 }
 
-fn click(app: &AppHandle, x: i32, y: i32, button: &str) -> String {
-    let Some(state) = app.try_state::<crate::input::EnigoState>() else {
-        return "Couldn't click: input backend isn't initialised.".into();
-    };
-    let Ok(mut enigo) = state.0.lock() else {
-        return "Couldn't click: input backend is busy.".into();
-    };
-    use enigo::{Button, Coordinate, Direction, Mouse};
-    let btn = match button {
-        "right" => Button::Right,
-        "middle" => Button::Middle,
-        _ => Button::Left,
-    };
-    if let Err(e) = enigo.move_mouse(x, y, Coordinate::Abs) {
-        return format!("Couldn't move the cursor: {}", e);
-    }
-    match enigo.button(btn, Direction::Click) {
-        Ok(_) => format!("Clicked at {}, {}.", x, y),
-        Err(e) => format!("Couldn't click: {}", e),
-    }
+/// Move to and click an absolute screen coordinate (main thread).
+///
+/// WINDOWS VERIFY: `Coordinate::Abs` targets physical desktop pixels. On
+/// multi-monitor / HiDPI (125/150/200% scaling) confirm the coordinate the
+/// model supplies (usually derived from a Snapshot, which reports physical
+/// pixels) lands on the intended element and does not drift on secondary
+/// monitors with negative origins.
+async fn click(app: &AppHandle, x: i32, y: i32, button: &str) -> String {
+    let button = button.to_string();
+    exec_on_main(app, "click", move |enigo| {
+        use enigo::{Button, Coordinate, Direction, Mouse};
+        let btn = match button.as_str() {
+            "right" => Button::Right,
+            "middle" => Button::Middle,
+            _ => Button::Left,
+        };
+        if let Err(e) = enigo.move_mouse(x, y, Coordinate::Abs) {
+            return format!("Couldn't move the cursor: {}", e);
+        }
+        match enigo.button(btn, Direction::Click) {
+            Ok(_) => format!("Clicked at {}, {}.", x, y),
+            Err(e) => format!("Couldn't click: {}", e),
+        }
+    })
+    .await
 }
 
-fn move_mouse(app: &AppHandle, x: i32, y: i32) -> String {
-    let Some(state) = app.try_state::<crate::input::EnigoState>() else {
-        return "Couldn't move the cursor: input backend isn't initialised.".into();
-    };
-    let Ok(mut enigo) = state.0.lock() else {
-        return "Couldn't move the cursor: input backend is busy.".into();
-    };
-    use enigo::{Coordinate, Mouse};
-    match enigo.move_mouse(x, y, Coordinate::Abs) {
-        Ok(_) => format!("Moved the cursor to {}, {}.", x, y),
-        Err(e) => format!("Couldn't move the cursor: {}", e),
-    }
+/// Move the cursor to an absolute screen coordinate without clicking (main
+/// thread). Same HiDPI/multi-monitor caveat as `click`.
+async fn move_mouse(app: &AppHandle, x: i32, y: i32) -> String {
+    exec_on_main(app, "move the cursor", move |enigo| {
+        use enigo::{Coordinate, Mouse};
+        match enigo.move_mouse(x, y, Coordinate::Abs) {
+            Ok(_) => format!("Moved the cursor to {}, {}.", x, y),
+            Err(e) => format!("Couldn't move the cursor: {}", e),
+        }
+    })
+    .await
 }
 
 fn clip_for_result(text: &str) -> String {
