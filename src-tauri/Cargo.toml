@@ -1,16 +1,14 @@
 [package]
 name = "keyfloe"
-version = "0.1.12"
-description = "Keyfloe — a floating AI companion that listens, sees what's on screen, and helps without interrupting your flow."
-authors = ["Onefloe <hello@onefloe.com>"]
-license = "GPL-3.0"
-repository = "https://github.com/danlhw/keyfloe-windows"
-homepage = "https://github.com/danlhw/keyfloe-windows"
-documentation = "https://github.com/danlhw/keyfloe-windows/wiki"
-readme = "../README.md"
-keywords = ["ai-assistant", "tauri", "desktop-app", "privacy-first", "meeting-assistant"]
-categories = ["gui", "multimedia", "accessibility", "science", "development-tools"]
+version = "0.1.13"
+description = "Keyfloe — your keyboard, supercharged"
+authors = ["cjpais"]
 edition = "2021"
+license = "MIT"
+default-run = "keyfloe"
+
+[profile.dev]
+incremental = true # Compile your binary in smaller steps.
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -18,55 +16,172 @@ edition = "2021"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "keyfloe_lib"
+name = "keyfloe_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+# [[bin]]
+# name = "cli"
+# path = "src/audio_toolkit/bin/cli.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
-dotenv = "0.15"
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
 
 [dependencies]
-tauri = { version = "2", features = ["macos-private-api"] }
-tauri-plugin-opener = "2"
-tauri-plugin-updater = "2.9.0"
-tauri-plugin-http = "2.5.2"
-tauri-plugin-global-shortcut = "2"
-tauri-plugin-keychain = "2.0"
+once_cell = "1"
+tauri = { version = "2.10.2", features = [
+  "protocol-asset",
+  "macos-private-api",
+  "tray-icon",
+  'image-png',
+] }
+tauri-plugin-log = "2.7.1"
+tauri-plugin-opener = "2.5.2"
+tauri-plugin-store = "2.4.1"
+tauri-plugin-os = "2.3.2"
+tauri-plugin-clipboard-manager = "2.3.2"
+tauri-plugin-macos-permissions = "2.3.0"
+tauri-plugin-process = "2.3.1"
+rusqlite_migration = "2.3"
+tauri-plugin-fs = "2.4.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-image = "0.25.6"
-xcap = "0.0.12"
-base64 = "0.22"
-cpal = "0.15.3"
+rdev = { git = "https://github.com/rustdesk-org/rdev" }
+cpal = "0.16.0"
+anyhow = "1.0.95"
+rubato = "0.16.2"
 hound = "3.5.1"
-tokio = { version = "1.0", features = ["full"] }
-once_cell = "1.19.0"
-uuid = { version = "1.0", features = ["v4"] }
+log = "0.4.25"
+env_filter = "0.1.0"
+tokio = "1.43.0"
+vad-rs = { git = "https://github.com/cjpais/vad-rs", default-features = false }
+enigo = "0.6.1"
+rodio = { git = "https://github.com/cjpais/rodio.git" }
 reqwest = { version = "0.12", features = ["json", "stream", "multipart"] }
-dotenv = "0.15"
+# Keyfloe: AI Snapshot region capture + image encode (all cross-platform).
+xcap = "0.9"
+image = "0.25"
+base64 = "0.22"
 futures-util = "0.3"
-anyhow = "1.0"
-tracing = "0.1"
-ringbuf = "0.4.8"
-tauri-plugin-shell = "2.3.1"
-tauri-plugin-sql = { version = "2", features = ["sqlite"] }
-tauri-plugin-posthog = "0.2.4"
-tauri-plugin-machine-uid = "0.1.2"
-# Keyboard input simulation — used to auto-paste dictation into the focused
-# field (SendInput on Windows, CGEvent on macOS). Cross-platform; same code.
-enigo = "0.2"
+rustfft = "6.4.0"
+strsim = "0.11.0"
+natural = "0.5.0"
+regex = "1"
+chrono = "0.4"
+rusqlite = { version = "0.37", features = ["bundled"] }
+tar = "0.4.44"
+flate2 = "1.0"
+sha2 = "0.10"
+# Whisper-family models run through transcribe-cpp (GGUF/ggml, native backends);
+# transcribe-rs is now ONNX-only (Parakeet, Moonshine, SenseVoice, GigaAM,
+# Canary, Cohere). Per-platform backend features are added in the target tables.
+transcribe-rs = { version = "0.3.8", features = ["onnx"] }
+transcribe-cpp = { version = "0.1.1", default-features = false }
+handy-keys = "0.2.4"
+ferrous-opencc = { version = "0.2.3", optional = true }
+clap = { version = "4", features = ["derive"] }
+specta = "=2.0.0-rc.22"
+specta-typescript = "0.0.9"
+tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
+tauri-plugin-dialog = "2.6"
+hf-hub = { git = "https://github.com/cjpais/hf-hub", branch = "cancellable-downloads", features = [
+  "tokio",
+] }
+
+[target.'cfg(unix)'.dependencies]
+signal-hook = "0.3"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-autostart = "2.5.1"
+tauri-plugin-global-shortcut = "2.3.1"
+tauri-plugin-single-instance = "2.3.2"
+tauri-plugin-updater = "2.10.0"
+
+[features]
+# Chinese Simplified<->Traditional conversion of transcription output (OpenCC).
+# On by default (real Windows/CI builds keep it). Disabled only for the
+# macOS-hosted cargo-xwin cross-compile: ferrous-opencc's build script spawns a
+# nested `cargo metadata` that inherits cargo-xwin's target linker flag and
+# fails the host rustc probe. Irrelevant to a non-Chinese test build.
+default = ["chinese-conversion"]
+chinese-conversion = ["dep:ferrous-opencc"]
+
+[target.'cfg(windows)'.dependencies]
+# ONNX Runtime on Windows is CPU-only (no ort-directml), matching macOS/Linux.
+# The DirectML EP was experimental and, more importantly, pulled in pyke's
+# prebuilt ONNX Runtime which is compiled with a global /arch:AVX2 baseline that
+# executes BMI2/AVX in a static initializer and crashes at process startup on any
+# pre-Haswell CPU (Sandy/Ivy Bridge, older AMD). Dropping the feature means we
+# link a baseline ONNX Runtime (dynamically, via ORT_LIB_LOCATION in build.yml)
+# with proper runtime CPU dispatch. Base `transcribe-rs` (features = ["onnx"])
+# is inherited here, so Parakeet/Moonshine/etc. still run on CPU.
+windows = { version = "0.61.3", features = [
+  "Win32_Media_Audio_Endpoints",
+  "Win32_System_Com",
+  "Win32_System_Com_StructuredStorage",
+  "Win32_System_Variant",
+  "Win32_Foundation",
+  "Win32_UI_WindowsAndMessaging",
+  # Keyfloe: dictation focus save/restore + interview exclude-from-capture use
+  # the above; the correction-learner UIA field read uses Accessibility.
+  "Win32_UI_Accessibility",
+  "Win32_Graphics_Gdi",
+] }
+# Keyfloe: the tap/hold key-remap engine's WH_KEYBOARD_LL hook (hook.rs).
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_UI_Input_KeyboardAndMouse",
+] }
+winreg = "0.55"
+
+# Whisper backend per Windows arch. x86_64 ships the Vulkan GPU backend and
+# keeps the dynamic-backends posture (loadable per-ISA CPU modules + Vulkan),
+# where runtime ISA scoring (GGML_CPU_ALL_VARIANTS) earns the extra shipped DLLs.
+#
+# Windows-on-ARM is CPU-only: its Adreno Vulkan drivers are immature, and
+# ggml-vulkan's shader generator (vulkan-shaders-gen) does not build under the
+# clang-cl/lld toolchain that ggml's ARM CPU backend requires. dynamic-backends
+# buys nothing on ARM — ALL_VARIANTS is an x86 concept, so a DL build there is
+# just a single portable CPU module shipped as a DLL. So ARM links transcribe-cpp
+# STATICALLY (no features = static CPU-only): the one CPU backend is compiled into
+# handy.exe and we ship zero DLLs, which sidesteps the installer's per-DLL
+# signtool verify entirely. CI pins -DGGML_NATIVE=OFF (see build.yml) so the
+# static build targets a portable ARM baseline, not the build runner's CPU.
+# NOTE: for the macOS-hosted cross-compile (cargo-xwin) test build we link
+# transcribe-cpp STATICALLY CPU-only (no vulkan / no dynamic-backends), matching
+# the ARM posture below. Vulkan needs the SPIRV shader generator + Vulkan SDK,
+# which do not cross-compile from macOS. The GPU (vulkan) + dynamic-backends
+# posture is restored for the on-Windows CI build (see windows-build.yml).
+[target.'cfg(all(windows, target_arch = "x86_64"))'.dependencies]
+transcribe-cpp = { version = "0.1.1", default-features = false }
+
+[target.'cfg(all(windows, target_arch = "aarch64"))'.dependencies]
+transcribe-cpp = { version = "0.1.1", default-features = false }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-tauri-plugin-macos-permissions = "2"
-cidre = "0.11.3"
-tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2" }
-
-[target.'cfg(target_os = "windows")'.dependencies]
-wasapi = "0.19.0"
+tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
+transcribe-cpp = { version = "0.1.1", default-features = false, features = ["metal"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-libpulse-binding = "2.30.1"
-libpulse-simple-binding = "2.29.0"
+gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
+gtk = "0.18"
+transcribe-cpp = { version = "0.1.1", default-features = false, features = [
+  "dynamic-backends",
+  "vulkan",
+] }
 
-[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
-tauri-plugin-autostart = "2.5.0"
+[patch.crates-io]
+tauri-runtime = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }
+tauri-runtime-wry = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }
+tauri-utils = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "unwind"

@@ -1,183 +1,179 @@
-import * as React from "react";
-import * as SelectPrimitive from "@radix-ui/react-select";
-import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import React from "react";
+import SelectComponent from "react-select";
+import CreatableSelect from "react-select/creatable";
+import type {
+  ActionMeta,
+  Props as ReactSelectProps,
+  SingleValue,
+  StylesConfig,
+} from "react-select";
 
-import { cn } from "@/lib/utils";
-
-function Select({
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />;
-}
-
-function SelectGroup({
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Group>) {
-  return <SelectPrimitive.Group data-slot="select-group" {...props} />;
-}
-
-function SelectValue({
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Value>) {
-  return <SelectPrimitive.Value data-slot="select-value" {...props} />;
-}
-
-function SelectTrigger({
-  className,
-  size = "default",
-  children,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
-  size?: "sm" | "default";
-}) {
-  return (
-    <SelectPrimitive.Trigger
-      data-slot="select-trigger"
-      data-size={size}
-      className={cn(
-        "border-input data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 dark:hover:bg-input/50 flex w-fit items-center justify-between gap-2 rounded-xl border bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-11 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
-      {...props}
-    >
-      {children}
-      <SelectPrimitive.Icon asChild>
-        <ChevronDownIcon className="size-4 opacity-50" />
-      </SelectPrimitive.Icon>
-    </SelectPrimitive.Trigger>
-  );
-}
-
-function SelectContent({
-  className,
-  children,
-  position = "popper",
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Content>) {
-  return (
-    <SelectPrimitive.Portal>
-      <SelectPrimitive.Content
-        data-slot="select-content"
-        className={cn(
-          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-xl border shadow-md",
-          position === "popper" &&
-            "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
-          className
-        )}
-        position={position}
-        {...props}
-      >
-        <SelectScrollUpButton />
-        <SelectPrimitive.Viewport
-          className={cn(
-            "p-1",
-            position === "popper" &&
-              "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
-          )}
-        >
-          {children}
-        </SelectPrimitive.Viewport>
-        <SelectScrollDownButton />
-      </SelectPrimitive.Content>
-    </SelectPrimitive.Portal>
-  );
-}
-
-function SelectLabel({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Label>) {
-  return (
-    <SelectPrimitive.Label
-      data-slot="select-label"
-      className={cn("text-muted-foreground px-2 py-1.5 text-xs", className)}
-      {...props}
-    />
-  );
-}
-
-function SelectItem({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Item>) {
-  return (
-    <SelectPrimitive.Item
-      data-slot="select-item"
-      className={cn(
-        "h-11 focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-xl py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
-        className
-      )}
-      {...props}
-    >
-      <span className="absolute right-2 flex size-3.5 items-center justify-center">
-        <SelectPrimitive.ItemIndicator>
-          <CheckIcon className="size-4" />
-        </SelectPrimitive.ItemIndicator>
-      </span>
-      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
-    </SelectPrimitive.Item>
-  );
-}
-
-function SelectSeparator({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Separator>) {
-  return (
-    <SelectPrimitive.Separator
-      data-slot="select-separator"
-      className={cn("bg-border pointer-events-none -mx-1 my-1 h-px", className)}
-      {...props}
-    />
-  );
-}
-
-function SelectScrollUpButton({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.ScrollUpButton>) {
-  return (
-    <SelectPrimitive.ScrollUpButton
-      data-slot="select-scroll-up-button"
-      className={cn(
-        "flex cursor-default items-center justify-center py-1",
-        className
-      )}
-      {...props}
-    >
-      <ChevronUpIcon className="size-4" />
-    </SelectPrimitive.ScrollUpButton>
-  );
-}
-
-function SelectScrollDownButton({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.ScrollDownButton>) {
-  return (
-    <SelectPrimitive.ScrollDownButton
-      data-slot="select-scroll-down-button"
-      className={cn(
-        "flex cursor-default items-center justify-center py-1",
-        className
-      )}
-      {...props}
-    >
-      <ChevronDownIcon className="size-4" />
-    </SelectPrimitive.ScrollDownButton>
-  );
-}
-
-export {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectScrollDownButton,
-  SelectScrollUpButton,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
+export type SelectOption = {
+  value: string;
+  label: string;
+  isDisabled?: boolean;
 };
+
+type BaseProps = {
+  value: string | null;
+  options: SelectOption[];
+  placeholder?: string;
+  disabled?: boolean;
+  isLoading?: boolean;
+  isClearable?: boolean;
+  onChange: (value: string | null, action: ActionMeta<SelectOption>) => void;
+  onBlur?: () => void;
+  className?: string;
+  formatCreateLabel?: (input: string) => string;
+};
+
+type CreatableProps = {
+  isCreatable: true;
+  onCreateOption: (value: string) => void;
+};
+
+type NonCreatableProps = {
+  isCreatable?: false;
+  onCreateOption?: never;
+};
+
+export type SelectProps = BaseProps & (CreatableProps | NonCreatableProps);
+
+const baseBackground =
+  "color-mix(in srgb, var(--color-mid-gray) 10%, transparent)";
+const hoverBackground =
+  "color-mix(in srgb, var(--color-logo-primary) 12%, transparent)";
+const focusBackground =
+  "color-mix(in srgb, var(--color-logo-primary) 20%, transparent)";
+const neutralBorder =
+  "color-mix(in srgb, var(--color-mid-gray) 80%, transparent)";
+
+const selectStyles: StylesConfig<SelectOption, false> = {
+  control: (base, state) => ({
+    ...base,
+    minHeight: 40,
+    borderRadius: 6,
+    borderColor: state.isFocused ? "var(--color-logo-primary)" : neutralBorder,
+    boxShadow: state.isFocused ? "0 0 0 1px var(--color-logo-primary)" : "none",
+    backgroundColor: state.isFocused ? focusBackground : baseBackground,
+    fontSize: "0.875rem",
+    color: "var(--color-text)",
+    transition: "all 150ms ease",
+    ":hover": {
+      borderColor: "var(--color-logo-primary)",
+      backgroundColor: hoverBackground,
+    },
+  }),
+  valueContainer: (base) => ({
+    ...base,
+    paddingInline: 10,
+    paddingBlock: 6,
+  }),
+  input: (base) => ({
+    ...base,
+    color: "var(--color-text)",
+  }),
+  singleValue: (base) => ({
+    ...base,
+    color: "var(--color-text)",
+  }),
+  dropdownIndicator: (base, state) => ({
+    ...base,
+    color: state.isFocused
+      ? "var(--color-logo-primary)"
+      : "color-mix(in srgb, var(--color-mid-gray) 80%, transparent)",
+    ":hover": {
+      color: "var(--color-logo-primary)",
+    },
+  }),
+  clearIndicator: (base) => ({
+    ...base,
+    color: "color-mix(in srgb, var(--color-mid-gray) 80%, transparent)",
+    ":hover": {
+      color: "var(--color-logo-primary)",
+    },
+  }),
+  menu: (provided) => ({
+    ...provided,
+    zIndex: 30,
+    backgroundColor: "var(--color-background)",
+    color: "var(--color-text)",
+    border:
+      "1px solid color-mix(in srgb, var(--color-mid-gray) 30%, transparent)",
+    boxShadow: "0 10px 30px rgba(15, 15, 15, 0.2)",
+  }),
+  option: (base, state) => ({
+    ...base,
+    backgroundColor: state.isSelected
+      ? focusBackground
+      : state.isFocused
+        ? hoverBackground
+        : "transparent",
+    color: "var(--color-text)",
+    cursor: state.isDisabled ? "not-allowed" : base.cursor,
+    opacity: state.isDisabled ? 0.5 : 1,
+  }),
+  placeholder: (base) => ({
+    ...base,
+    color: "color-mix(in srgb, var(--color-mid-gray) 65%, transparent)",
+  }),
+};
+
+export const Select: React.FC<SelectProps> = React.memo(
+  ({
+    value,
+    options,
+    placeholder,
+    disabled,
+    isLoading,
+    isClearable = true,
+    onChange,
+    onBlur,
+    className = "",
+    isCreatable,
+    formatCreateLabel,
+    onCreateOption,
+  }) => {
+    const selectValue = React.useMemo(() => {
+      if (!value) return null;
+      const existing = options.find((option) => option.value === value);
+      if (existing) return existing;
+      return { value, label: value, isDisabled: false };
+    }, [value, options]);
+
+    const handleChange = (
+      option: SingleValue<SelectOption>,
+      action: ActionMeta<SelectOption>,
+    ) => {
+      onChange(option?.value ?? null, action);
+    };
+
+    const sharedProps: Partial<ReactSelectProps<SelectOption, false>> = {
+      className,
+      classNamePrefix: "app-select",
+      value: selectValue,
+      options,
+      onChange: handleChange,
+      placeholder,
+      isDisabled: disabled,
+      isLoading,
+      onBlur,
+      isClearable,
+      styles: selectStyles,
+    };
+
+    if (isCreatable) {
+      return (
+        <CreatableSelect<SelectOption, false>
+          {...sharedProps}
+          onCreateOption={onCreateOption}
+          formatCreateLabel={formatCreateLabel}
+        />
+      );
+    }
+
+    return <SelectComponent<SelectOption, false> {...sharedProps} />;
+  },
+);
+
+Select.displayName = "Select";

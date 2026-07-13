@@ -1,61 +1,74 @@
-import * as React from "react"
-import * as SliderPrimitive from "@radix-ui/react-slider"
+import React from "react";
+import { SettingContainer } from "./SettingContainer";
 
-import { cn } from "@/lib/utils"
-
-function Slider({
-  className,
-  defaultValue,
-  value,
-  min = 0,
-  max = 100,
-  ...props
-}: React.ComponentProps<typeof SliderPrimitive.Root>) {
-  const _values = React.useMemo(
-    () =>
-      Array.isArray(value)
-        ? value
-        : Array.isArray(defaultValue)
-          ? defaultValue
-          : [min, max],
-    [value, defaultValue, min, max]
-  )
-
-  return (
-    <SliderPrimitive.Root
-      data-slot="slider"
-      defaultValue={defaultValue}
-      value={value}
-      min={min}
-      max={max}
-      className={cn(
-        "relative flex w-full touch-none items-center select-none data-[disabled]:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-44 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col",
-        className
-      )}
-      {...props}
-    >
-      <SliderPrimitive.Track
-        data-slot="slider-track"
-        className={cn(
-          "bg-muted relative grow overflow-hidden rounded-full data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5"
-        )}
-      >
-        <SliderPrimitive.Range
-          data-slot="slider-range"
-          className={cn(
-            "bg-primary absolute data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full"
-          )}
-        />
-      </SliderPrimitive.Track>
-      {Array.from({ length: _values.length }, (_, index) => (
-        <SliderPrimitive.Thumb
-          data-slot="slider-thumb"
-          key={index}
-          className="border-primary ring-ring/50 block size-4 shrink-0 rounded-full border bg-white shadow-sm transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
-        />
-      ))}
-    </SliderPrimitive.Root>
-  )
+interface SliderProps {
+  value: number;
+  onChange: (value: number) => void;
+  min: number;
+  max: number;
+  step?: number;
+  disabled?: boolean;
+  label: string;
+  description: string;
+  descriptionMode?: "inline" | "tooltip";
+  grouped?: boolean;
+  showValue?: boolean;
+  formatValue?: (value: number) => string;
 }
 
-export { Slider }
+export const Slider: React.FC<SliderProps> = ({
+  value,
+  onChange,
+  min,
+  max,
+  step = 0.01,
+  disabled = false,
+  label,
+  description,
+  descriptionMode = "tooltip",
+  grouped = false,
+  showValue = true,
+  formatValue = (v) => v.toFixed(2),
+}) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(parseFloat(e.target.value));
+  };
+
+  return (
+    <SettingContainer
+      title={label}
+      description={description}
+      descriptionMode={descriptionMode}
+      grouped={grouped}
+      layout="horizontal"
+      disabled={disabled}
+    >
+      <div className="w-full">
+        <div className="flex items-center space-x-1 h-6">
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={handleChange}
+            disabled={disabled}
+            className="flex-grow h-2 rounded-lg appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-logo-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: `linear-gradient(to right, var(--color-background-ui) ${
+                ((value - min) / (max - min)) * 100
+              }%, rgba(128, 128, 128, 0.2) ${
+                ((value - min) / (max - min)) * 100
+              }%)`,
+            }}
+          />
+          {showValue && (
+            <span className="text-sm font-medium text-text/90 w-12 text-end">
+              {formatValue(value)}
+            </span>
+          )}
+        </div>
+      </div>
+    </SettingContainer>
+  );
+};
